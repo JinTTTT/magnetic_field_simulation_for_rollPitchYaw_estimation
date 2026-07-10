@@ -1,0 +1,11 @@
+# virtual environment
+.venv/
+
+# python
+__pycache__/
+*.pyc
+
+# generated outputs
+*.html
+*.csv
+*.png
