@@ -1,19 +1,22 @@
 # Magnet field & rotary-sensor simulation
 
-Simulates the magnetic field of a small disc magnet and a 3-axis sensor orbiting
-it, using [magpylib](https://magpylib.readthedocs.io) for the physics and
-[Plotly](https://plotly.com/python/) for interactive 3D views.
+Simulates the magnetic field of a small disc magnet and a 3-axis sensor
+(TLV493D-style) near it, using [magpylib](https://magpylib.readthedocs.io) for
+the physics and [Plotly](https://plotly.com/python/) for interactive 3D views.
 
 Magnet: 3 mm diameter × 2 mm tall disc, at the origin, N face → +x.
 
 ## Scripts
 
-| Script | What it does | Output |
-|---|---|---|
-| `magnet_3d.py` | Traced 3D field lines of the magnet, colored by \|B\|. | `magnet_3d.html` |
-| `magnet_sensor.py` | A sensor at `(0, -2, -1)` rotates a full turn about the z-axis; records the B vector it reads in its own frame and plots it in 3D. | `magnet_sensor.html`, `magnet_sensor_readings.csv` |
+| Script | What it shows |
+|---|---|
+| `magnet_3d.py` | Traced 3D field lines of the magnet, colored by \|B\|. |
+| `magnet_sensor.py` | Sensor orbits the magnet about z (full turn); B in the sensor frame. Both \|B\| and direction vary — decodes yaw. |
+| `magnet_sensor_pitch.py` | Sensor fixed at `(0,-2,-1)`, pitched in place about y (−30°→+30°); B in the sensor frame. \|B\| constant, only the direction rotates — decodes pitch. |
 
-Each field line / arrow is hoverable to read the field strength at that position.
+Each script opens an interactive WebGL view in the browser. Drag to rotate,
+scroll to zoom, hover a line/arrow to read the field values. Nothing is written
+to disk — just run the script when you want to see it.
 
 ## Setup
 
@@ -27,15 +30,17 @@ python -m venv .venv
 ```bash
 .venv/bin/python magnet_3d.py
 .venv/bin/python magnet_sensor.py
+.venv/bin/python magnet_sensor_pitch.py
 ```
-
-Both open an interactive WebGL view in the browser and also write a self-contained
-`.html` file. Drag to rotate, scroll to zoom, hover to read values.
 
 ## Notes
 
-- Rotating the sensor rigidly about z means its local axes turn with it, so the
-  reading is `B_sensor(θ) = Rz(θ)⁻¹ · B_world(Rz(θ)·p₀)`.
-- The sensor is placed off the z = 0 plane (`z = -1`) on purpose: an in-plane
-  orbit is planar (`Bz = 0`) and has a yaw ambiguity near the pole crossing;
-  going off-plane makes the reading fully 3D and uniquely decodable over a full turn.
+- The sensor reads the field on its own (rotating) axes:
+  `B_sensor(θ) = R(θ)⁻¹ · B_world(pos(θ))`.
+- **Orbit (yaw)** moves the sensor to different field points, so magnitude and
+  direction both change. **Pitch in place** keeps the position fixed, so `|B|` is
+  constant and only the direction rotates — cleanly decodable via the component
+  ratio (amplitude-independent).
+- x is the magnet's symmetry axis, so rotating the sensor *about that axis*
+  (roll around the N–S line) is a symmetry: the reading never changes and roll is
+  unobservable. Pitch and yaw are the two measurable rotational DOF.
