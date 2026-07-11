@@ -9,3 +9,5 @@ __pycache__/
 *.html
 *.csv
 *.png
+!figures/
+!figures/*.png
