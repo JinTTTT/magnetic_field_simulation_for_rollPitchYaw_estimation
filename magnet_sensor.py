@@ -1,11 +1,13 @@
 #!/usr/bin/env python
-"""B of a disc magnet read in a 3-axis sensor's own frame as the sensor orbits.
+"""B in the sensor's own frame as the shell YAWS about z (centered magnet).
 
-Magnet 3x2 mm at the origin, N -> +x. Sensor starts at (0,-2,-1) and rotates
-rigidly about z a full turn; its axes turn with it, so it reads
-    B_sensor(t) = Rz(t)^-1 . B_world(Rz(t).p0).
-Off the z=0 plane the reading is fully 3D, removing the yaw ambiguity of an
-in-plane orbit. Opens an interactive 3D view of B in the sensor frame.
+The sensor starts at (0,-2,-1) and rides the shell through a full yaw turn:
+its position AND its axes rotate together, so it reads
+    B_sensor = Rz^-1 . B_world(Rz . p0).
+Yawing moves the sensor to places with different field, so both the direction
+and the strength of the reading change -- yaw is measurable (see README Q2).
+
+Opens an interactive 3D view of the reading vector, colored by |B|.
 """
 import numpy as np
 import magpylib as magpy

@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 """Estimate yaw, pitch AND roll from two 3-axis magnetic sensor readings.
 
-The idea (see README "The invisible rotation"):
+The idea (see README Q3):
   - The magnet is glued 0.5 mm OFF-CENTER. A centered magnet's field is
     perfectly round about its N-S line, so roll would be invisible.
   - TWO sensors are used. One sensor alone has poses where some angle
     combination barely changes its reading; the second sensor covers those.
+    Their positions (the shell's +z and -z poles) come from
+    optimize_sensor_placement.py.
 
 The program has two halves:
   predict_readings(yaw, pitch, roll) -- the "forward" direction:
@@ -29,8 +31,10 @@ magnet = magpy.magnet.Cylinder(polarization=(0, 0, 1.2), dimension=(3, 2))
 magnet.rotate_from_angax(90, "y", anchor=(0, 0, 0))   # turn it so N faces +x
 magnet.position = (0, 0.5, 0)                         # 0.5 mm off-center (the trick)
 
-SENSOR_1_HOME = np.array([0.0, -2.0, -1.0])   # sensor positions at zero angles
-SENSOR_2_HOME = np.array([0.0, -1.0,  2.0])
+# sensor positions at zero angles: the shell's -z and +z poles (optimized
+# placement for this workspace, found by optimize_sensor_placement.py)
+SENSOR_1_HOME = np.array([0.0, 0.0, -np.sqrt(5.0)])
+SENSOR_2_HOME = np.array([0.0, 0.0,  np.sqrt(5.0)])
 
 SENSOR_NOISE = 0.1e-3                          # 0.1 mT of noise per axis
 
