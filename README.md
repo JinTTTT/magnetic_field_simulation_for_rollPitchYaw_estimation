@@ -14,6 +14,7 @@ Magnet: 3 mm × 2 mm disc at the origin, N face → +x.
 | `magnet_sensor.py` | Sensor orbits about z (full turn); B in the sensor frame — decodes yaw. |
 | `magnet_sensor_pitch.py` | Sensor fixed at `(0,-2,-1)`, pitched about y (±30°); B in the sensor frame — decodes pitch. |
 | `estimate_yaw_pitch.py` | Simulate a raw `(Bx,By,Bz)` from known yaw/pitch/roll, then estimate yaw & pitch back from it. |
+| `estimate_yaw_pitch_roll.py` | All three angles from two sensors + the off-center magnet: simulate the 6 raw numbers, recover yaw/pitch/roll by lookup grid + least squares (~0.06° with 0.1 mT noise). |
 
 The plotting scripts open an interactive browser view (drag/scroll/hover);
 nothing is saved to disk. `estimate_yaw_pitch.py` just prints.
