@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """B in the sensor's own frame as the shell YAWS about z (centered magnet).
 
-The sensor starts at (0,-2,-1) and rides the shell through a full yaw turn:
+The sensor starts at (0,-13.4,-6.7) and rides the shell through a full yaw turn:
 its position AND its axes rotate together, so it reads
     B_sensor = Rz^-1 . B_world(Rz . p0).
 Yawing moves the sensor to places with different field, so both the direction
@@ -14,10 +14,10 @@ import magpylib as magpy
 import plotly.graph_objects as go
 from scipy.spatial.transform import Rotation as Rot
 
-magnet = magpy.magnet.Cylinder(polarization=(0, 0, 1.2), dimension=(3, 2))
+magnet = magpy.magnet.Cylinder(polarization=(0, 0, 1.2), dimension=(10, 5))
 magnet.rotate_from_angax(90, "y", anchor=(0, 0, 0))
 
-p0 = np.array([0.0, -2.0, -1.0])                     # sensor start (mm)
+p0 = np.array([0.0, -13.4, -6.7])                    # sensor start (mm)
 angles = np.linspace(0, 360, 73)                     # full turn, 5 deg steps
 Rz = Rot.from_euler("z", angles, degrees=True)
 
@@ -60,7 +60,7 @@ for vec, lab in ([A, 0, 0], "x_s"), ([0, A, 0], "y_s"), ([0, 0, A], "z_s"):
                                hoverinfo="skip"))
 lim = A * 1.05
 fig.update_layout(
-    title="Sensor orbiting about z (start 0,-2,-1) — B in the sensor frame",
+    title="Sensor orbiting about z (start 0,-13.4,-6.7) — B in the sensor frame",
     showlegend=False,
     scene=dict(xaxis=dict(title="x_s (mm)", range=[-lim, lim]),
                yaxis=dict(title="y_s (mm)", range=[-lim, lim]),

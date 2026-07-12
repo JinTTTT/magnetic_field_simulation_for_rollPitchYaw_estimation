@@ -19,7 +19,7 @@ from scipy.spatial.transform import Rotation
 
 
 def make_magnet(offset):
-    m = magpy.magnet.Cylinder(polarization=(0, 0, 1.2), dimension=(3, 2))
+    m = magpy.magnet.Cylinder(polarization=(0, 0, 1.2), dimension=(10, 5))
     m.rotate_from_angax(90, "y", anchor=(0, 0, 0))    # N faces +x
     m.position = offset
     return m
@@ -90,16 +90,16 @@ if __name__ == "__main__":
     os.makedirs("figures", exist_ok=True)
 
     centered = make_magnet((0, 0, 0))
-    offset = make_magnet((0, 0.5, 0))
-    side_sensor = np.array([0.0, -2.0, -1.0])          # the Q1/Q2 sensor
-    pole_sensor = np.array([0.0, 0.0, -np.sqrt(5.0)])  # a final-design sensor
+    offset = make_magnet((0, 3.0, 0))
+    side_sensor = np.array([0.0, -13.4, -6.7])         # the Q1/Q2 sensor (15 mm)
+    pole_sensor = np.array([0.0, 0.0, -15.0])          # a final-design sensor
 
     # Figure 1 (Q1+Q2): centered magnet -- yaw & pitch fan out, roll is frozen
     make_figure([(centered, side_sensor, "yaw", 120),
                  (centered, side_sensor, "pitch", 25),
                  (centered, side_sensor, "roll", 25)],
                 "sweeps_centered_magnet.png",
-                "Centered magnet, one sensor at (0,-2,-1): "
+                "Centered magnet, one sensor at (0,-13.4,-6.7): "
                 "yaw and pitch change the reading, roll does not")
 
     # Figure 2 (Q3): the off-center trick makes roll visible.
@@ -107,7 +107,7 @@ if __name__ == "__main__":
     fig, axes = plt.subplots(1, 2, figsize=(9, 3.6), sharey=True)
     rolls = np.linspace(-25, 25, 51)
     for ax, magnet, label in [(axes[0], centered, "magnet centered"),
-                              (axes[1], offset, "magnet 0.5 mm off-center")]:
+                              (axes[1], offset, "magnet 3 mm off-center")]:
         curves = np.array([reading(magnet, side_sensor, 0, 0, r) for r in rolls]) * 1e3
         for i, name in enumerate(["Bx", "By", "Bz"]):
             ax.plot(rolls, curves[:, i], lw=2, label=name)
@@ -117,7 +117,7 @@ if __name__ == "__main__":
         ax.grid(alpha=0.3)
     axes[0].set_ylabel("reading (mT)")
     axes[0].legend(fontsize=8)
-    fig.suptitle("The same roll sweep, one sensor at (0,-2,-1): "
+    fig.suptitle("The same roll sweep, one sensor at (0,-13.4,-6.7): "
                  "centered = frozen, off-center = visible", fontsize=11)
     fig.tight_layout()
     fig.savefig("figures/roll_centered_vs_offset.png", dpi=150)

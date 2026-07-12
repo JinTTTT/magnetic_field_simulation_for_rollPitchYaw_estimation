@@ -21,11 +21,11 @@ from scipy.spatial.transform import Rotation
 from scipy.optimize import least_squares
 
 # ---------------- the hardware ------------------------------------------------
-magnet = magpy.magnet.Cylinder(polarization=(0, 0, 1.2), dimension=(3, 2))
+magnet = magpy.magnet.Cylinder(polarization=(0, 0, 1.2), dimension=(10, 5))
 magnet.rotate_from_angax(90, "y", anchor=(0, 0, 0))   # turn it so N faces +x
 # NOTE: the magnet stays centered at (0,0,0) -- that is WHY roll is invisible.
 
-SENSOR_HOME = np.array([0.0, -2.0, -1.0])   # sensor position at zero angles
+SENSOR_HOME = np.array([0.0, -13.4, -6.7])  # sensor position at zero angles (15 mm)
 SENSOR_NOISE = 0.1e-3                        # 0.1 mT of noise per axis
 
 

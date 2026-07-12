@@ -9,10 +9,13 @@ no contact.
 
 | Part | Details |
 |---|---|
-| Magnet | disc 3 mm dia × 2 mm, axially magnetized NdFeB (N on a flat face, ~1.2 T) |
-| Sensors | 2 × Infineon TLV493D, 3-axis, ~0.1 mT noise per axis |
-| Geometry | magnet at the pivot center, N–S line along x; sensors on the shell, 2.24 mm from the pivot |
+| Magnet | disc 10 mm dia × 5 mm, axially magnetized NdFeB N35 (N on a flat face, ~1.2 T) |
+| Sensors | 2 × Infineon TLV493D (Adafruit breakout, ±130 mT range), ~0.1 mT noise per axis |
+| Geometry | magnet at the pivot, N–S line along x; sensors on the shell, 15 mm from the pivot (the breakout board is 25 mm wide, so the chip cannot ride much closer) |
 | Workspace | yaw ±120° (about z), pitch ±25° (about y), roll ±25° (about x = the N–S line) |
+
+The field at the sensors peaks at ~15 mT over the whole workspace — comfortably
+inside the TLV493D's ±130 mT linear range.
 
 ## How everything is verified
 
@@ -49,7 +52,7 @@ changes by 0.0 mT over the whole ±25° sweep.*
 **Yes.** Yaw and pitch move the sensor to places where the field is different,
 so the reading changes and the two angles can be recovered from a single
 sensor's 3 numbers — for any roll, since roll has no effect on them.
-Accuracy in simulation: ~0.1° typical, ~0.4° worst (0.1 mT noise).
+Accuracy in simulation: ~0.4° typical, ~0.8° worst (0.1 mT noise).
 
 *Experiment:* `estimate_yaw_pitch.py` part 2. A 3D view of the reading
 changing along a yaw sweep: `magnet_sensor.py`.
@@ -58,7 +61,7 @@ changing along a yaw sweep: `magnet_sensor.py`.
 
 Two changes, each fixing a different problem:
 
-**1. Mount the magnet off-center** (0.5 mm, perpendicular to the N–S line).
+**1. Mount the magnet off-center** (3 mm, perpendicular to the N–S line).
 The field is round about the line through the magnet's *center* along N–S;
 shifting the magnet moves that line away from the pivot, so no rotation about
 any pivot axis leaves the field unchanged — roll becomes visible.
@@ -70,8 +73,8 @@ dipoles at one point merge into a single tilted dipole — still round).
 ![roll sweep, centered vs off-center magnet](figures/roll_centered_vs_offset.png)
 *The proof of the off-center trick: the same ±25° roll sweep, same sensor.
 Centered magnet (left): every reading component is a flat line — zero
-information. Magnet shifted 0.5 mm (right): the reading now changes by
-13.4 mT across the sweep — 134× the sensor noise, plenty to decode roll.*
+information. Magnet shifted 3 mm (right): the reading now changes by
+1.3 mT across the sweep — 13× the sensor noise, plenty to decode roll.*
 
 **2. Use two sensors.** One sensor gives 3 numbers for 3 unknowns — zero
 margin. It has weak poses (some angle combination barely changes the reading)
@@ -83,8 +86,9 @@ sensitivity metric for the rest — at every pose, the signal (mT per degree) in
 the *quietest* combination of the three angles; expected error ≈ noise /
 sensitivity; a design is judged by its worst pose. A placement-optimization
 study against that metric put the two sensors at the shell's **+z and −z
-poles** (worst case 1.66 mT/° → 0.06° over the whole workspace) and confirmed
-the magnet itself is already at its size/offset limit.
+poles** (worst case 0.17 mT/° → ~0.6° expected over the whole workspace).
+The 10×5 mm magnet is sized for the 15 mm sensor distance: big enough for
+sub-degree signal, small enough to stay far from the sensor's ±130 mT limit.
 
 ## Q4 — The final solution, and how well it works
 
@@ -97,8 +101,8 @@ the magnet itself is already at its size/offset limit.
 
 ![reading under all three sweeps, final design](figures/sweeps_final_design.png)
 *The final geometry (off-center magnet, sensor at the shell's −z pole): now
-every rotation produces a strong change — yaw fans the vector 120°, pitch 83°,
-and roll changes the reading by ~59 mT (it stretches the vector rather than
+every rotation produces a strong change — yaw fans the vector 120°, pitch 91°,
+and roll changes the reading by ~6 mT (it stretches the vector rather than
 turning it, which is why the arrows overlap; the |B| range in the title shows
 the change). No angle is silent anymore.*
 
@@ -107,17 +111,17 @@ Verified in simulation, 0.1 mT noise, whole workspace:
 | Test | Result |
 |---|---|
 | no noise, random poses | exact (0.000°) — no look-alikes anywhere |
-| random poses with noise | ~0.03° median, <0.1° worst |
-| workspace corners, weak-band poses | same as everywhere else |
-| tracking a smooth motion | ~11 ms per estimate (plain Python) |
+| random poses with noise | ~0.45° median, ~1.1° at 95%, ~1.6° worst |
+| workspace corners, weak-band poses | same as everywhere else (~0.46° median) |
+| tracking a smooth motion | ~9 ms per estimate (plain Python) |
 
 ## Limitations
 
-- **Accuracy is proportional to sensor noise**: 0.1 mT → ~0.06°; 0.5 mT → ~0.3°.
-  Averaging N samples improves it by √N.
-- **Field strength exceeds the TLV493D range**: peaks at ~240 mT in this
-  workspace vs ±130 mT linear range. Before building: weaker magnet, larger
-  shell, or a higher-range sensor.
+- **Accuracy is proportional to sensor noise**: 0.1 mT → ~0.45° median,
+  ~1.6° worst. Averaging N samples improves it by √N (4 samples → ~0.2°
+  median). For sub-0.1° accuracy the sensors must ride much closer to a
+  smaller magnet — but then the field exceeds the TLV493D's ±130 mT range
+  (an earlier 2.24 mm design achieved 0.06° on paper and saturated the chip).
 - The simulation assumes a perfect magnet, exact placements, no temperature
   drift, and no iron nearby. Reality differs — see below.
 - Possible upgrade, studied but not adopted: a *diametrally* magnetized disc
@@ -136,7 +140,7 @@ Verified in simulation, 0.1 mT noise, whole workspace:
    code does not change. The leftover mismatch after fitting is a built-in
    health check: if it stays well above sensor noise, something unmodeled is
    present (e.g. a steel screw), or the field model needs extra terms.
-3. **Sensor practicalities**: check saturation first (see Limitations); two
+3. **Sensor practicalities**: two
    TLV493D on one I²C bus need their two addresses set at power-up; average
    4–8 samples per reading; calibrate and operate at similar temperature, or
    let the estimator track a slow field-scale drift.
