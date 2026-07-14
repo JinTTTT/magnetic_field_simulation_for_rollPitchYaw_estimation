@@ -1,0 +1,212 @@
+#!/usr/bin/env python
+"""The physical setup and the forward field model (the "simulation").
+
+Hardware (matches the real rig in figures/):
+  - Magnet: TWO identical NdFeB discs (10 mm dia x 5 mm) stacked pole-to-pole,
+    acting as one 10 mm-thick cylinder. Its N-S line points along +x (the roll
+    axis). The magnet is raised to (0, 0, 10) mm -- off the pivot center along z,
+    which is what makes roll observable.
+  - Sensors: two 3-axis TLV493D on a ring of radius 25 mm in the z = 0 plane,
+    120 deg apart in azimuth (sensor 1 "up" at +y, sensor 2 lower-right).
+
+The pivot is at the origin. The magnet is fixed; the two sensors ride the shell,
+so a shell rotation (yaw, pitch, roll) carries the sensors to new positions and
+turns their axes with them.
+
+This module has NO estimation code -- see estimation.py for the inverse solve.
+Run it directly to open a 3D view of the setup (magnet, field, sensors):
+
+    .venv/bin/python simulation.py
+"""
+import numpy as np
+import magpylib as magpy
+from scipy.spatial.transform import Rotation
+
+# ---------------- the magnet --------------------------------------------------
+# dimension=(diameter, height): two 10x5 discs stacked => a 10x10 cylinder.
+magnet = magpy.magnet.Cylinder(polarization=(0, 0, 1.2), dimension=(10, 10))
+magnet.rotate_from_angax(90, "y", anchor=(0, 0, 0))   # N-S line now along +x
+magnet.position = (0, 0, 10)                          # raised 10 mm along z
+
+# ---------------- the two sensors (home positions, at zero angles) ------------
+SENSOR_RADIUS = 25.0            # mm, ring radius in the z = 0 plane
+SENSOR_1_AZIMUTH = 90.0         # deg from +x (CCW): sensor 1 sits at +y ("up")
+SENSOR_SEPARATION = 120.0       # deg between the two sensors
+
+
+def _ring_point(azimuth_deg):
+    a = np.radians(azimuth_deg)
+    return np.array([SENSOR_RADIUS * np.cos(a),
+                     SENSOR_RADIUS * np.sin(a),
+                     0.0])
+
+
+SENSOR_1_HOME = _ring_point(SENSOR_1_AZIMUTH)
+SENSOR_2_HOME = _ring_point(SENSOR_1_AZIMUTH - SENSOR_SEPARATION)
+SENSOR_HOMES = (SENSOR_1_HOME, SENSOR_2_HOME)
+
+SENSOR_NOISE = 0.1e-3           # 0.1 mT of noise per axis
+
+# workspace of the device
+YAW_RANGE = (-120, 120)
+PITCH_RANGE = (-25, 25)
+ROLL_RANGE = (-25, 25)
+
+
+# ---------------- forward direction: angles -> readings -----------------------
+def predict_readings(yaw, pitch, roll):
+    """The 6 numbers the two chips report when the shell stands at these angles.
+
+    The magnet is fixed; the shell (with the sensors) rotates, so each sensor is
+    carried to rotation.apply(home) and reports the field in its own turned frame.
+    """
+    rotation = Rotation.from_euler("zyx", [yaw, pitch, roll], degrees=True)
+    readings = []
+    for home in SENSOR_HOMES:
+        position = rotation.apply(home)             # shell carries the sensor
+        field_world = magnet.getB(position)         # true field there (world axes)
+        field_chip = rotation.inv().apply(field_world)   # into the chip's frame
+        readings.extend(field_chip)
+    return np.array(readings)                        # [B1x B1y B1z B2x B2y B2z]
+
+
+def simulate(yaw, pitch, roll, noise=0.0):
+    """predict_readings plus optional sensor noise (a fake measurement)."""
+    readings = predict_readings(yaw, pitch, roll)
+    if noise > 0:
+        readings = readings + np.random.default_rng().normal(0, noise, 6)
+    return readings
+
+
+# ---------------- 3D visualization of the setup -------------------------------
+MAGNET_CENTER = np.array([0.0, 0.0, 10.0])
+MAGNET_RADIUS = 5.0                 # mm (10 mm diameter)
+MAGNET_HALF_LEN = 5.0               # mm (10 mm long: two 5 mm discs, N-S along x)
+
+
+def _cylinder_mesh(a, b, radius, color, n=48):
+    """A plotly Mesh3d cylinder (with end caps) spanning point a to point b."""
+    import plotly.graph_objects as go
+    a, b = np.asarray(a, float), np.asarray(b, float)
+    axis = b - a
+    ahat = axis / np.linalg.norm(axis)
+    # two vectors perpendicular to the axis
+    ref = np.array([1.0, 0, 0]) if abs(ahat[0]) < 0.9 else np.array([0, 1.0, 0])
+    u = np.cross(ahat, ref); u /= np.linalg.norm(u)
+    v = np.cross(ahat, u)
+    t = np.linspace(0, 2 * np.pi, n, endpoint=False)
+    ring = np.outer(np.cos(t), u) + np.outer(np.sin(t), v)   # (n,3) unit ring
+    r0 = a + radius * ring
+    r1 = b + radius * ring
+    verts = np.vstack([r0, r1, a, b])            # 2n ring verts + 2 cap centers
+    c0, c1 = 2 * n, 2 * n + 1
+    i, j, k = [], [], []
+    for s in range(n):
+        s2 = (s + 1) % n
+        i += [s, s];        j += [s2, n + s2];  k += [n + s2, n + s]   # side quad
+        i += [c0];          j += [s];           k += [s2]              # cap a
+        i += [c1];          j += [n + s2];       k += [n + s]           # cap b
+    return go.Mesh3d(x=verts[:, 0], y=verts[:, 1], z=verts[:, 2],
+                     i=i, j=j, k=k, color=color, flatshading=True,
+                     hoverinfo="skip", showscale=False)
+
+
+def _field_line(seed, sign=1.0, step=0.5, max_steps=1200):
+    """Trace one 3D magnetic field line by RK4 integration along B/|B|."""
+    def deriv(p):
+        B = magnet.getB(p)
+        nb = np.linalg.norm(B)
+        return None if nb < 1e-12 else sign * B / nb
+
+    def inside(p):   # inside the magnet body?
+        d = p - MAGNET_CENTER
+        return abs(d[0]) < MAGNET_HALF_LEN and np.hypot(d[1], d[2]) < MAGNET_RADIUS
+
+    pts = [np.asarray(seed, float)]
+    p = pts[0].copy()
+    for _ in range(max_steps):
+        k1 = deriv(p)
+        if k1 is None: break
+        k2 = deriv(p + 0.5 * step * k1)
+        if k2 is None: break
+        k3 = deriv(p + 0.5 * step * k2)
+        if k3 is None: break
+        k4 = deriv(p + step * k3)
+        if k4 is None: break
+        p = p + step / 6 * (k1 + 2 * k2 + 2 * k3 + k4)
+        pts.append(p.copy())
+        if inside(p) or np.abs(p).max() > 40 or p[2] < -30:
+            break
+    return np.array(pts)
+
+
+def build_figure():
+    """A clean 3D plotly figure: red/blue magnet, field lines, two sensors, origin."""
+    import plotly.graph_objects as go
+    fig = go.Figure()
+
+    # ---- magnetic field lines (grey curves) looping N -> S, seeded on rings
+    #      just off the N pole face at several radii and azimuths ----
+    seeds = []
+    for rho in (3.2, 4.0, 4.7):
+        for th in np.linspace(0, 2 * np.pi, 12, endpoint=False):
+            offset = np.array([0.0, rho * np.cos(th), rho * np.sin(th)])
+            seeds.append(MAGNET_CENTER + np.array([MAGNET_HALF_LEN + 0.5, 0, 0]) + offset)
+    for seed in seeds:
+        line = _field_line(seed, sign=1.0, step=0.4, max_steps=1600)
+        if len(line) > 3:
+            fig.add_trace(go.Scatter3d(
+                x=line[:, 0], y=line[:, 1], z=line[:, 2], mode="lines",
+                line=dict(color="rgba(70,70,70,0.8)", width=2.5),
+                hoverinfo="skip", showlegend=False))
+
+    # ---- the magnet: real-size cylinder, S half red (-x), N half blue (+x) ----
+    mid = MAGNET_CENTER
+    fig.add_trace(_cylinder_mesh(mid + [-MAGNET_HALF_LEN, 0, 0], mid,
+                                 MAGNET_RADIUS, "crimson"))       # S pole
+    fig.add_trace(_cylinder_mesh(mid, mid + [MAGNET_HALF_LEN, 0, 0],
+                                 MAGNET_RADIUS, "royalblue"))     # N pole
+    fig.add_trace(go.Scatter3d(
+        x=[mid[0] + MAGNET_HALF_LEN + 2.5, mid[0] - MAGNET_HALF_LEN - 2.5],
+        y=[0, 0], z=[10, 10], mode="text",
+        text=["<b>N</b>", "<b>S</b>"],
+        textfont=dict(size=18, color=["royalblue", "crimson"]),
+        hoverinfo="skip", showlegend=False))
+
+    # ---- the two sensors: small dark cylinders (flat, like the chip) ----
+    for home, label in zip(SENSOR_HOMES, ("sensor 1", "sensor 2")):
+        fig.add_trace(_cylinder_mesh(home + [0, 0, -1.0], home + [0, 0, 1.0],
+                                     3.5, "#2b2b2b"))
+        fig.add_trace(go.Scatter3d(
+            x=[home[0]], y=[home[1]], z=[home[2] + 3],
+            mode="text", text=[f"<b>{label}</b><br>({home[0]:.0f},{home[1]:.0f},{home[2]:.0f})"],
+            textfont=dict(size=12, color="black"), hoverinfo="skip", showlegend=False))
+
+    # ---- origin (0,0,0) ----
+    fig.add_trace(go.Scatter3d(
+        x=[0], y=[0], z=[0], mode="markers+text",
+        marker=dict(size=4, color="black"),
+        text=["origin (0,0,0)"], textposition="bottom center",
+        hoverinfo="skip", showlegend=False))
+
+    fig.update_layout(
+        title="Magnet (S=red, N=blue) at (0,0,10), N-S along x — 2 sensors 120° apart, r=25 mm",
+        showlegend=False,
+        scene=dict(xaxis_title="x (mm)", yaxis_title="y (mm)", zaxis_title="z (mm)",
+                   aspectmode="data",
+                   camera=dict(eye=dict(x=1.5, y=1.5, z=1.1))),
+        margin=dict(l=0, r=0, t=40, b=0))
+    return fig
+
+
+if __name__ == "__main__":
+    fig = build_figure()
+    fig.write_html("figures/setup_3d.html", include_plotlyjs="inline")
+    print("wrote figures/setup_3d.html")
+    try:
+        fig.write_image("figures/setup_3d.png", width=1100, height=850, scale=2)
+        print("wrote figures/setup_3d.png")
+    except Exception as e:
+        print("PNG export skipped:", e)
+    print("\nsensor 1 home:", np.round(SENSOR_1_HOME, 2))
+    print("sensor 2 home:", np.round(SENSOR_2_HOME, 2))

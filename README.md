@@ -1,157 +1,110 @@
-# Measuring 3 rotation angles with a magnet and magnetic sensors
+# Measuring 3 rotation angles with a magnet and two magnetic sensors
 
-A ball joint: a small magnet is fixed at the pivot center, and 3-axis magnetic
+A ball joint: a small magnet is fixed near the pivot, and two 3-axis magnetic
 sensors ride on the shell that rotates around it. Goal: read the shell's three
-rotation angles — yaw, pitch, roll — from the sensor values alone. No encoder,
-no contact.
+rotation angles — **yaw, pitch, roll** — from the sensor values alone. No
+encoder, no contact.
 
-## Hardware
+Everything here is verified in simulation (no hardware needed). Fields are
+computed with [magpylib](https://magpylib.readthedocs.io) (exact analytic field
+of a cylinder magnet); the inverse solve uses `scipy.optimize.least_squares`.
+
+![the setup](figures/setup_3d.png)
+
+## The setup (matches the physical rig)
 
 | Part | Details |
 |---|---|
-| Magnet | disc 10 mm dia × 5 mm, axially magnetized NdFeB N35 (N on a flat face, ~1.2 T) |
-| Sensors | 2 × Infineon TLV493D (Adafruit breakout, ±130 mT range), ~0.1 mT noise per axis |
-| Geometry | magnet at the pivot, N–S line along x; sensors on the shell, 15 mm from the pivot (the breakout board is 25 mm wide, so the chip cannot ride much closer) |
-| Workspace | yaw ±120° (about z), pitch ±25° (about y), roll ±25° (about x = the N–S line) |
+| Magnet | two NdFeB discs (10 mm dia × 5 mm, N35) stacked pole-to-pole → one 10 mm-thick cylinder, ~1.2 T. Its **N–S line points along +x** (the roll axis). |
+| Position | raised to **(0, 0, 10) mm** — off the pivot center. This offset is what makes roll observable (see below). |
+| Sensors | 2 × Infineon TLV493D (±130 mT range, ~0.1 mT noise/axis), on a ring of **radius 25 mm** in the z = 0 plane, **120° apart** in azimuth. |
+| Pivot | at the origin (0,0,0). The magnet is fixed; the two sensors ride the shell and rotate about the pivot. |
+| Workspace | yaw ±120° (about z), pitch ±25° (about y), roll ±25° (about x). |
 
-The field at the sensors peaks at ~15 mT over the whole workspace — comfortably
-inside the TLV493D's ±130 mT linear range.
+Across the whole workspace the per-sensor field stays between **2.5 and 15 mT** —
+strong enough for sub-degree signal, far inside the TLV493D's ±130 mT range.
 
-## How everything is verified
+**Why roll is observable.** A magnet's field is perfectly round about its own
+N–S line. If the magnet sat exactly at the pivot, rolling the shell about that
+line would carry the sensors through identical field and roll would be invisible.
+Raising the magnet to (0,0,10) moves its symmetry line off the pivot, so no
+rotation leaves the field unchanged — roll becomes readable. Two sensors 120°
+apart (seeing complementary parts of the field) remove ambiguous "look-alike"
+poses; a single sensor's 3 numbers for 3 unknowns leaves no margin.
 
-No hardware is needed for this study. Fields are computed with
-[magpylib](https://magpylib.readthedocs.io) (exact analytic field of a cylinder
-magnet), 3D views with [Plotly](https://plotly.com/python/), sensor noise
-simulated at 0.1 mT. Every claim below names the script that demonstrates it.
+## How it works — three pieces
+
+```
+simulation.py          geometry + forward model + the 3D view above
+build_lookup_table.py  sweep the workspace → lookup_table.npz
+estimation.py          load the table → nearest guess → least_squares
+```
+
+**1. Forward model — `simulation.py`.**
+`predict_readings(yaw, pitch, roll)` returns the 6 numbers the two chips would
+report at that pose: the shell carries each sensor to `rotation.apply(home)`, the
+magnet's field there is computed, then rotated back into the chip's own frame.
+
+**2. Lookup table — `build_lookup_table.py`.**
+Sweeps a grid (yaw −120…120 step 10°, pitch & roll ±25 step 5° → **3,025 poses**)
+and stores each pose's 6 readings in `lookup_table.npz`. Rebuild any time the
+geometry changes.
+
+**3. Estimator — `estimation.py`.**
+`estimate(measured, seed=None)` inverts the model in two stages:
+- *stage 1:* compare the measurement against the table, take the 3 closest poses
+  as starting guesses (3, not 1, to dodge look-alike regions);
+- *stage 2:* `least_squares` fine-tunes each guess against `predict_readings`
+  until predicted = measured; the best fit wins.
+
+In a tracking loop, pass the previous frame's answer as `seed` to skip the table.
+
+## Accuracy (simulation, 0.1 mT noise, whole workspace)
+
+| axis | median | 95th percentile |
+|---|---|---|
+| yaw | 0.51° | 1.69° |
+| pitch | 0.43° | 1.41° |
+| roll | 0.64° | 2.04° |
+| **worst of the three** | **1.00°** | **2.22°** (worst seen ≈ 3.6°) |
+
+No look-alikes anywhere (0 of 500 random poses missed). ~58 ms per cold-start
+estimate in plain Python; far faster in tracking mode (`seed=` skips the lookup).
+Roll is the weakest axis, as expected — it rides on the off-center offset alone.
+
+## Run it
 
 ```bash
 python -m venv .venv
-.venv/bin/pip install numpy scipy magpylib plotly
-.venv/bin/python <script>.py
+.venv/bin/pip install numpy scipy magpylib plotly kaleido
+.venv/bin/python simulation.py            # opens/saves the 3D setup view
+.venv/bin/python build_lookup_table.py    # writes lookup_table.npz
+.venv/bin/python estimation.py            # noise-in / accuracy-out demo
 ```
 
-## Q1 — Can 1 magnet + 1 sensor measure all three rotations?
-
-**No. Roll is invisible — provably, not just in practice.**
-The magnet's field is perfectly round about its own N–S line. Rolling the
-shell about that line carries every sensor through identical field, so no
-reading changes. This is exact (machine precision) and independent of how many
-sensors are used: the information simply is not in the field.
-
-*Experiment:* `estimate_yaw_pitch.py` part 1 sweeps roll and prints the frozen
-reading.
-
-![reading under yaw, pitch and roll sweeps, centered magnet](figures/sweeps_centered_magnet.png)
-*The sensor's reading vector (in its own frame) while one angle sweeps and the
-others stay at zero. Yaw (left) and pitch (middle) fan the vector out — lots of
-signal. Roll (right): all arrows lie exactly on top of each other; the reading
-changes by 0.0 mT over the whole ±25° sweep.*
-
-## Q2 — Can it still measure yaw and pitch?
-
-**Yes.** Yaw and pitch move the sensor to places where the field is different,
-so the reading changes and the two angles can be recovered from a single
-sensor's 3 numbers — for any roll, since roll has no effect on them.
-Accuracy in simulation: ~0.4° typical, ~0.8° worst (0.1 mT noise).
-
-*Experiment:* `estimate_yaw_pitch.py` part 2. A 3D view of the reading
-changing along a yaw sweep: `magnet_sensor.py`.
-
-## Q3 — What does it take to measure all three?
-
-Two changes, each fixing a different problem:
-
-**1. Mount the magnet off-center** (3 mm, perpendicular to the N–S line).
-The field is round about the line through the magnet's *center* along N–S;
-shifting the magnet moves that line away from the pivot, so no rotation about
-any pivot axis leaves the field unchanged — roll becomes visible.
-Dead ends we tested on the way: *tilting* a centered magnet does not help (the
-symmetry line tilts along and still passes through the pivot), and *two
-magnets* do not beat one (they split the limited space, and two crossed
-dipoles at one point merge into a single tilted dipole — still round).
-
-![roll sweep, centered vs off-center magnet](figures/roll_centered_vs_offset.png)
-*The proof of the off-center trick: the same ±25° roll sweep, same sensor.
-Centered magnet (left): every reading component is a flat line — zero
-information. Magnet shifted 3 mm (right): the reading now changes by
-1.3 mT across the sweep — 13× the sensor noise, plenty to decode roll.*
-
-**2. Use two sensors.** One sensor gives 3 numbers for 3 unknowns — zero
-margin. It has weak poses (some angle combination barely changes the reading)
-and "look-alike" pose pairs with identical readings. The second sensor's weak
-poses fall elsewhere, and 6 numbers for 3 unknowns remove the look-alikes.
-
-How the solution was derived: a symmetry argument for the offset, plus a
-sensitivity metric for the rest — at every pose, the signal (mT per degree) in
-the *quietest* combination of the three angles; expected error ≈ noise /
-sensitivity; a design is judged by its worst pose. A placement-optimization
-study against that metric put the two sensors at the shell's **+z and −z
-poles** (worst case 0.17 mT/° → ~0.6° expected over the whole workspace).
-The 10×5 mm magnet is sized for the 15 mm sensor distance: big enough for
-sub-degree signal, small enough to stay far from the sensor's ±130 mT limit.
-
-## Q4 — The final solution, and how well it works
-
-`estimate_yaw_pitch_roll.py` — off-center magnet, sensors at the ±z poles:
-
-- `predict_readings(yaw, pitch, roll)` — forward model: angles → the 6 numbers.
-- A lookup table (3,025 poses, built once) turns a measurement into a rough
-  starting guess; `least_squares` fine-tunes it until predicted = measured.
-- Pass the previous frame's answer as `seed` to skip the table (tracking mode).
-
-![reading under all three sweeps, final design](figures/sweeps_final_design.png)
-*The final geometry (off-center magnet, sensor at the shell's −z pole): now
-every rotation produces a strong change — yaw fans the vector 120°, pitch 91°,
-and roll changes the reading by ~6 mT (it stretches the vector rather than
-turning it, which is why the arrows overlap; the |B| range in the title shows
-the change). No angle is silent anymore.*
-
-Verified in simulation, 0.1 mT noise, whole workspace:
-
-| Test | Result |
-|---|---|
-| no noise, random poses | exact (0.000°) — no look-alikes anywhere |
-| random poses with noise | ~0.45° median, ~1.1° at 95%, ~1.6° worst |
-| workspace corners, weak-band poses | same as everywhere else (~0.46° median) |
-| tracking a smooth motion | ~9 ms per estimate (plain Python) |
-
-## Limitations
-
-- **Accuracy is proportional to sensor noise**: 0.1 mT → ~0.45° median,
-  ~1.6° worst. Averaging N samples improves it by √N (4 samples → ~0.2°
-  median). For sub-0.1° accuracy the sensors must ride much closer to a
-  smaller magnet — but then the field exceeds the TLV493D's ±130 mT range
-  (an earlier 2.24 mm design achieved 0.06° on paper and saturated the chip).
-- The simulation assumes a perfect magnet, exact placements, no temperature
-  drift, and no iron nearby. Reality differs — see below.
-- Possible upgrade, studied but not adopted: a *diametrally* magnetized disc
-  (as in commercial rotary encoders) scored ~45% better in an exploratory
-  study and gives a more even field; re-evaluate with the real workspace.
-
-## From simulation to a real device
-
-1. **Build** with non-magnetic materials near the shell (brass/plastic screws).
-2. **Calibrate instead of trusting the drawing.** Mounting errors are
-   unavoidable; absorb them by fitting the model to reality: collect readings
-   at ~50–100 known poses (a simple jig with repeatable stops is enough), then
-   fit the ~25 physical parameters (magnet position/orientation/strength, each
-   sensor's position/orientation/zero-offset) with the same `least_squares`
-   machinery. Rebuild the lookup table from the fitted model — the estimator
-   code does not change. The leftover mismatch after fitting is a built-in
-   health check: if it stays well above sensor noise, something unmodeled is
-   present (e.g. a steel screw), or the field model needs extra terms.
-3. **Sensor practicalities**: two
-   TLV493D on one I²C bus need their two addresses set at power-up; average
-   4–8 samples per reading; calibrate and operate at similar temperature, or
-   let the estimator track a slow field-scale drift.
-4. **Runtime**: call `estimate(reading, seed=previous_answer)` — tracking mode
-   is fast and inherently smooth.
+`estimation.py` auto-builds the table if `lookup_table.npz` is missing.
 
 ## Scripts
 
-| Script | Shows |
+| File | Role |
 |---|---|
-| `magnet_sensor.py` | reading vs yaw sweep (sensor frame, interactive 3D view) |
-| `estimate_yaw_pitch.py` | Q1 + Q2: roll invisible, yaw & pitch recovered (1 sensor) |
-| `estimate_yaw_pitch_roll.py` | Q4: the final estimator, with demo |
-| `make_figures.py` | regenerates the figures in `figures/` |
+| `simulation.py` | hardware geometry, forward field model, 3D visualization |
+| `build_lookup_table.py` | builds `lookup_table.npz` from the forward model |
+| `estimation.py` | inverse solve: 6 readings → (yaw, pitch, roll) |
+| `lookup_table.npz` | generated (3,025 poses × 6 readings); git-ignored |
+
+## Limitations & from simulation to a real device
+
+- **Accuracy scales with sensor noise.** 0.1 mT → ~1° worst-axis median.
+  Averaging N samples improves it by √N (e.g. 4 samples ≈ halve the error).
+- The simulation assumes a perfect magnet, exact placement, no temperature drift,
+  and no iron nearby.
+- **Calibrate instead of trusting the drawing.** Mounting errors are unavoidable;
+  absorb them by fitting the model to reality — collect readings at ~50–100 known
+  poses, fit the physical parameters (magnet position/orientation/strength, each
+  sensor's position/orientation/zero-offset) with the same `least_squares`
+  machinery, then rebuild the table. The estimator code does not change.
+- **Sensor practicalities.** Two TLV493D on one I²C bus need their two addresses
+  set at power-up; average 4–8 samples per reading; calibrate and operate at
+  similar temperature. Build with non-magnetic hardware (brass/plastic) near the
+  shell.
