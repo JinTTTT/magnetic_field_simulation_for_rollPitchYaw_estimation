@@ -1,11 +1,15 @@
 # From simulation to the real device
 
 Fit the physical model to the real rig, then build the lookup table from that
-fitted model. Ground truth comes from a **9-DOF IMU on the shell** via the
-**magnet-out / magnet-in** trick: magnet out → the IMU magnetometer sees Earth's
-field, so fusion gives drift-free yaw/pitch/roll; magnet in → record the two
-sensors' 6 numbers. The magnet is a separate fixed piece, so pulling it doesn't
-move the shell.
+fitted model. Ground truth comes from an **Xsens MTi-620 (VRU) on the shell**.
+
+**Why no magnet-swap is needed:** MEMS accel/gyro are immune to magnetic fields,
+and the MTi-620 derives orientation from accel + gyro only (it ignores the
+magnetometer). So the magnet **cannot corrupt its output**:
+- **roll & pitch** — from gravity, drift-free, read directly with the magnet in.
+- **yaw** — free-running gyro, so it slowly **drifts**; bound it by **re-zeroing
+  at a mechanical home stop** every few poses and keeping sessions short
+  (MTi gyro drift is small, <~1° over a few minutes).
 
 Do the phases in order; don't advance until the **gate** passes.
 
@@ -13,7 +17,7 @@ Do the phases in order; don't advance until the **gate** passes.
 |---|---|---|
 | 0 | Hardware bring-up | readings stable after averaging |
 | 1 | Test magnet mount | reinsertion spread < 0.1 mT |
-| 2 | Calibrate sensors + IMU | magnet-out reading ≈ 0; IMU heading repeatable |
+| 2 | Calibrate sensors + IMU | magnet-out reading ≈ 0; yaw re-zero repeatable |
 | 3 | Collect data (staged A→B→C) | Stage A sane; Stage B recovers angles |
 | 4 | Fit the model | residual → sensor noise (~0.1–0.2 mT) |
 | 5 | Build the table | \|B\| range matches measurement |
@@ -23,10 +27,13 @@ Do the phases in order; don't advance until the **gate** passes.
 
 ## Phase 0 — Hardware bring-up
 - Both TLV493D on one I²C bus (two addresses); confirm Bx,By,Bz in mT.
-- Mount the IMU rigidly on the shell, axes aligned to the joint, far from the magnet.
-- Average **8–16 samples** per reading. Log **temperature**.
+- Mount the MTi-620 rigidly on the shell, its axes aligned to the joint frame.
+  Stream orientation (roll/pitch/yaw) via MT Manager / the Xsens API.
+- Set up a **home stop** at (0,0,0) — a repeatable mechanical detent used to
+  re-zero the drifting yaw.
+- Average **8–16 samples** per magnetic reading. Log **temperature**.
 
-**Gate:** static readings stable to ≤ 0.05 mT; IMU pitch/roll to ≤ 0.2°.
+**Gate:** static magnetic readings stable to ≤ 0.05 mT; IMU roll/pitch to ≤ 0.2°.
 
 ## Phase 1 — Test the magnet mount (critical)
 Everything assumes the magnet returns to the exact same pose each time.
@@ -39,20 +46,26 @@ Everything assumes the magnet returns to the exact same pose each time.
 This number is the floor on your final accuracy.
 
 ## Phase 2 — Calibrate sensors + IMU
-- **Sensor offset:** magnet out, record each sensor's reading as its offset `b0`;
+- **Sensor offset:** magnet out, record each TLV493D's reading as its offset `b0`;
   subtract from all later readings.
-- **IMU magnetometer:** magnet out, run the standard hard/soft-iron ellipsoid
-  calibration so fused yaw is trustworthy.
+- **IMU:** no magnetometer calibration needed (the MTi-620 doesn't use it). Just
+  verify the **yaw re-zero**: return to the home stop, reset yaw to 0, and check
+  it reads ~0 each time you come back to the stop.
 
-**Gate:** magnet-out reading ≈ 0 (≤ 0.1 mT); IMU heading repeatable to ≤ 0.5°.
+**Gate:** magnet-out reading ≈ 0 (≤ 0.1 mT); yaw reads ~0 at the home stop to
+≤ 0.3° across repeats.
 
 ## Phase 3 — Collect calibration data
+No magnet swapping — the magnet stays in the whole time (it doesn't affect the
+MTi-620). Just manage yaw drift with the home stop.
+
 **Per pose:**
-1. Set the shell and **hold it fixed**.
-2. **Magnet OUT** → record `yaw,pitch,roll` from IMU fusion.
-3. **Magnet IN** → record `B1x…B2z` (average 8–16).
-4. **Cross-check:** accel pitch/roll should match between steps 2 and 3 (≤ 0.3°);
-   if not, you bumped the shell — discard.
+1. **Re-zero yaw** at the home stop (do this every few poses to bound drift).
+2. Move to a pose and **hold it fixed**.
+3. Record `yaw,pitch,roll` from the MTi-620 **and** `B1x…B2z` from the two
+   sensors (average 8–16) — at the same instant.
+4. Every so often, return to the home stop and confirm yaw is still ~0; if it has
+   drifted, re-zero and redo the poses since the last good re-zero.
 
 **CSV** (`calibration_data.csv`):
 ```
@@ -129,7 +142,7 @@ ferrous objects away.
 | Script | Phase | Purpose |
 |---|---|---|
 | `mount_test.py` | 1 | log reinsertions, report per-channel spread |
-| `log_calibration.py` | 3 | run the magnet-out/in procedure → CSV |
+| `log_calibration.py` | 3 | log MTi-620 pose + both sensors per pose → CSV |
 | `predict_readings(params, pose)` | 4 | refactor `simulation.py` to make geometry fittable |
 | `calibrate.py` | 4 | fit params, print residual, save `calibrated_geometry.json` |
 | `verify.py` | 6 | estimate on held-out poses, report accuracy |
