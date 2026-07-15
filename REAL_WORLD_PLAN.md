@@ -4,12 +4,23 @@ Fit the physical model to the real rig, then build the lookup table from that
 fitted model. Ground truth comes from an **Xsens MTi-620 (VRU) on the shell**.
 
 **Why no magnet-swap is needed:** MEMS accel/gyro are immune to magnetic fields,
-and the MTi-620 derives orientation from accel + gyro only (it ignores the
-magnetometer). So the magnet **cannot corrupt its output**:
+so the onboard fusion never lets the magnet corrupt the pose:
 - **roll & pitch** — from gravity, drift-free, read directly with the magnet in.
-- **yaw** — free-running gyro, so it slowly **drifts**; bound it by **re-zeroing
-  at a mechanical home stop** every few poses and keeping sessions short
-  (MTi gyro drift is small, <~1° over a few minutes).
+- **yaw** — not perturbed by the magnet. On a gyro-only (**VRU**) heading profile
+  the magnetometer is ignored outright; on an **AHRS** profile the XKF3 filter
+  treats the magnet as a magnetic **disturbance** and rejects it, trusting the
+  gyro for heading. *Confirmed empirically on the MTi-630:* moving a magnet around
+  the unit does not move the reported yaw. The cost either way is that yaw is
+  effectively free-running gyro and slowly **drifts** — bound it by **re-zeroing
+  at a mechanical home stop** every few poses and keeping sessions short (MTi gyro
+  drift is small, <~1° over a few minutes).
+
+> **Caveat — confirm with the magnet *mounted*, not just waved.** What's verified
+> so far is rejection of a *moving* magnet (a transient). A permanently mounted
+> magnet is a *sustained* field, which an AHRS profile could in principle slowly
+> trust. Before relying on this: hold a fixed pose for **~60 s with the magnet in**
+> and confirm yaw doesn't creep. If it does, switch the MTi to a **VRU/gyro-only**
+> profile, which removes the magnetometer from the heading solution entirely.
 
 Do the phases in order; don't advance until the **gate** passes.
 
