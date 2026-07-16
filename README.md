@@ -124,6 +124,12 @@ It reduces training RMS to 0.055 mT and strictly held-yaw RMS to 0.089 mT. The
 correction coefficients are embedded in `calibrated_geometry.json`, so table
 generation and live estimation use the same corrected forward model.
 
+**Live rig observation (2026-07-16):** in the tested live 3D motions, the
+corrected magnetic estimate stayed within approximately **2°** of the Xsens for
+yaw, pitch, and roll. This is an encouraging practical observation, not yet a
+formal full-workspace error bound; the table above remains the reproducible
+CSV-based verification result.
+
 ## Run it
 
 ```bash
