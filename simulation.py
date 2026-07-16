@@ -21,6 +21,9 @@ Run it directly to open a 3D view of the setup (magnet, field, sensors):
 
     .venv/bin/python simulation.py
 """
+import json
+import os
+
 import numpy as np
 import magpylib as magpy
 from scipy.spatial.transform import Rotation
@@ -54,6 +57,27 @@ SENSOR_HOMES = (SENSOR_1_HOME, SENSOR_2_HOME)
 
 SENSOR_NOISE = 0.1e-3           # 0.1 mT of noise per axis
 
+# ---------------- calibrated geometry (written by calibrate.py) ---------------
+# If calibrated_geometry.json exists, the fitted magnet replaces the nominal
+# one and each chip's fitted orientation + the IMU mount error are applied in
+# predict_readings. Without the file everything runs on the nominal drawing.
+_CHIP_ROTATIONS = (None, None)
+_IMU_MOUNT_ERR = None
+_CAL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                         "calibrated_geometry.json")
+if os.path.exists(_CAL_PATH):
+    with open(_CAL_PATH) as _f:
+        _cal = json.load(_f)
+    magnet = magpy.magnet.Cylinder(
+        polarization=(0, 0, _cal["polarization"]), dimension=(10, 5))
+    magnet.rotate_from_angax(90, "y", anchor=(0, 0, 0))
+    magnet.rotate_from_angax(_cal["tilt_y"], "y", anchor=(0, 0, 0))
+    magnet.rotate_from_angax(_cal["tilt_z"], "z", anchor=(0, 0, 0))
+    magnet.position = _cal["magnet_position"]
+    _CHIP_ROTATIONS = (Rotation.from_rotvec(_cal["chip_rotvec_S1"]),
+                       Rotation.from_rotvec(_cal["chip_rotvec_S2"]))
+    _IMU_MOUNT_ERR = Rotation.from_rotvec(_cal["imu_mount_rotvec"])
+
 # workspace of the device (pitch/roll narrowed to +-10 deg, 2026-07-16)
 YAW_RANGE = (-120, 120)
 PITCH_RANGE = (-10, 10)
@@ -68,11 +92,15 @@ def predict_readings(yaw, pitch, roll):
     carried to rotation.apply(home) and reports the field in its own turned frame.
     """
     rotation = Rotation.from_euler("zyx", [yaw, pitch, roll], degrees=True)
+    if _IMU_MOUNT_ERR is not None:
+        rotation = rotation * _IMU_MOUNT_ERR        # angles are the IMU's
     readings = []
-    for home in SENSOR_HOMES:
+    for home, chip_rot in zip(SENSOR_HOMES, _CHIP_ROTATIONS):
         position = rotation.apply(home)             # shell carries the sensor
         field_world = magnet.getB(position)         # true field there (world axes)
         field_chip = rotation.inv().apply(field_world)   # into the chip's frame
+        if chip_rot is not None:
+            field_chip = chip_rot.apply(field_chip)      # fitted die orientation
         readings.extend(field_chip)
     return np.array(readings)                        # [B1x B1y B1z B2x B2y B2z]
 
