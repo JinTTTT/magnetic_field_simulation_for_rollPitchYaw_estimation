@@ -26,6 +26,31 @@ Across the current calibrated lookup table the per-sensor field stays between
 **1.26 and 10.11 mT** —
 well above the ~0.1 mT noise floor, far inside the TLV493D's ±130 mT range.
 
+### Sensor range and measured fields
+
+The [TLV493D-A1B6 datasheet](https://www.infineon.com/assets/row/public/documents/24/49/infineon-tlv493d-a1b6-datasheet-en.pdf?fileId=5546d462525dbac40152a6b85c760e80)
+specifies a usable linear range of **−130 to +130 mT on each axis**. Its 12-bit
+readout step is **0.098 mT/LSB** (98 µT/LSB), with typical RMS magnetic noise of
+about **0.1 mT**. The installed Adafruit driver uses this 12-bit readout.
+
+The values below are the offset-corrected limits from all 137 currently recorded
+calibration and verification poses, in mT:
+
+| channel | minimum | maximum |
+|---|---:|---:|
+| S1 Bx | −4.520 | +4.141 |
+| S1 By | −7.203 | +4.404 |
+| S1 Bz | −1.617 | +2.707 |
+| S2 Bx | −3.638 | +3.118 |
+| S2 By | −5.439 | +6.076 |
+| S2 Bz | −1.960 | +1.954 |
+
+The largest measured absolute channel value is **7.203 mT**, about 5.5% of the
+specified per-axis range. Across both sensors, the measured vector magnitude
+`|B|` ranges from **1.585 to 7.675 mT**. Averaging does not change the raw sensor
+step, but averaged output can have smaller increments: 8 samples give
+0.01225 mT/count and 16 samples give 0.006125 mT/count.
+
 **Why roll is observable.** A magnet's field is perfectly round about its own
 N–S line. If the magnet sat exactly at the pivot, rolling the shell about that
 line would carry the sensors through identical field and roll would be invisible.
