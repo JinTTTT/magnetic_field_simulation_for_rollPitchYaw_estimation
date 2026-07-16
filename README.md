@@ -87,6 +87,21 @@ python -m venv .venv
 
 `estimation.py` auto-builds the table if `lookup_table.npz` is missing.
 
+With the sensors connected, estimate held poses from the calibrated model:
+
+```bash
+env/bin/python live_estimation.py                         # live angle display
+env/bin/python live_estimation.py --track                 # seed from previous estimate
+env/bin/python live_estimation.py --interactive           # ENTER for each pose
+env/bin/python live_estimation.py --verbose               # include fields and model residual
+env/bin/python live_estimation.py --compare-imu           # show Xsens truth/error
+env/bin/python live_estimation.py --replay calibration_data.csv
+```
+
+The live script subtracts `sensor_offsets.json`, converts the hardware readings
+from mT to T, and reports the field residual between each measurement and the
+model. Rebuild `lookup_table.npz` whenever `calibrated_geometry.json` changes.
+
 ## Scripts
 
 | File | Role |
@@ -94,6 +109,7 @@ python -m venv .venv
 | `simulation.py` | hardware geometry, forward field model, 3D visualization |
 | `build_lookup_table.py` | builds `lookup_table.npz` from the forward model |
 | `estimation.py` | inverse solve: 6 readings → (yaw, pitch, roll) |
+| `live_estimation.py` | recorded/live fields → estimated angles, residual, optional IMU comparison |
 | `lookup_table.npz` | generated (3,025 poses × 6 readings); git-ignored |
 
 ## Limitations & from simulation to a real device
