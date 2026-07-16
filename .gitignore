@@ -5,12 +5,3 @@
 __pycache__/
 *.pyc
 
-# generated outputs
-*.html
-*.csv
-*.png
-# lookup_table.npz -- rebuilt by build_lookup_table.py
-*.npz
-!figures/
-!figures/*.png
-env/

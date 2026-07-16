@@ -154,6 +154,7 @@ ferrous objects away.
 |---|---|---|
 | `mount_test.py` | 1 | log reinsertions, report per-channel spread |
 | `log_calibration.py` | 3 | log MTi-620 pose + both sensors per pose → CSV |
+| `log_verification.py` | 6 | record fresh held-out poses to a separate CSV |
 | `predict_readings(params, pose)` | 4 | refactor `simulation.py` to make geometry fittable |
 | `calibrate.py` | 4 | fit params, print residual, save `calibrated_geometry.json` |
 | `verify.py` | 6 | estimate on held-out poses, report accuracy |

@@ -102,6 +102,19 @@ The live script subtracts `sensor_offsets.json`, converts the hardware readings
 from mT to T, and reports the field residual between each measurement and the
 model. Rebuild `lookup_table.npz` whenever `calibrated_geometry.json` changes.
 
+Collect calibration and independent verification poses with a live IMU display:
+
+```bash
+env/bin/python log_calibration.py                 # target: 50 calibration poses
+env/bin/python log_verification.py                # target: 25 verification poses
+```
+
+Start each script at the mechanical home pose. The current IMU ground-truth
+angles update continuously; hold the rig still and press ENTER to record. Each
+row averages 16 fresh magnetic samples and all IMU frames from the same time
+window. The scripts write `calibration_data.csv` and `verification_data.csv`
+respectively, so verification poses remain separate from model fitting.
+
 ## Scripts
 
 | File | Role |
@@ -110,6 +123,8 @@ model. Rebuild `lookup_table.npz` whenever `calibrated_geometry.json` changes.
 | `build_lookup_table.py` | builds `lookup_table.npz` from the forward model |
 | `estimation.py` | inverse solve: 6 readings → (yaw, pitch, roll) |
 | `live_estimation.py` | recorded/live fields → estimated angles, residual, optional IMU comparison |
+| `log_calibration.py` | live IMU display and synchronized calibration-pose recording |
+| `log_verification.py` | same recorder, writing a separate verification dataset |
 | `lookup_table.npz` | generated (3,025 poses × 6 readings); git-ignored |
 
 ## Limitations & from simulation to a real device
