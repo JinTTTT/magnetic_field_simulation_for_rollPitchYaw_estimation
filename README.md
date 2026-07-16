@@ -33,21 +33,21 @@ specifies a usable linear range of **−130 to +130 mT on each axis**. Its 12-bi
 readout step is **0.098 mT/LSB** (98 µT/LSB), with typical RMS magnetic noise of
 about **0.1 mT**. The installed Adafruit driver uses this 12-bit readout.
 
-The values below are the offset-corrected limits from all 137 currently recorded
-calibration and verification poses, in mT:
+The values below are the offset-corrected limits from the 276 poses in the
+current calibration and verification files, in mT:
 
 | channel | minimum | maximum |
 |---|---:|---:|
-| S1 Bx | −4.520 | +4.141 |
-| S1 By | −7.203 | +4.404 |
-| S1 Bz | −1.617 | +2.707 |
-| S2 Bx | −3.638 | +3.118 |
-| S2 By | −5.439 | +6.076 |
-| S2 Bz | −1.960 | +1.954 |
+| S1 Bx | −4.955 | +5.108 |
+| S1 By | −8.550 | +5.145 |
+| S1 Bz | −2.009 | +3.099 |
+| S2 Bx | −4.704 | +4.030 |
+| S2 By | −7.117 | +7.332 |
+| S2 Bz | −2.334 | +2.193 |
 
-The largest measured absolute channel value is **7.203 mT**, about 5.5% of the
+The largest measured absolute channel value is **8.550 mT**, about 6.6% of the
 specified per-axis range. Across both sensors, the measured vector magnitude
-`|B|` ranges from **1.585 to 7.675 mT**. Averaging does not change the raw sensor
+`|B|` ranges from **1.169 to 9.138 mT**. Averaging does not change the raw sensor
 step, but averaged output can have smaller increments: 8 samples give
 0.01225 mT/count and 16 samples give 0.006125 mT/count.
 
@@ -104,24 +104,28 @@ numbers by √N.
 
 ## Current hardware result
 
-The extended model plus smooth field-residual correction was fitted to 117
-measured poses and evaluated on the older 20-pose dataset, which was not used by
-the new fit. The essential physical-model correction was using intrinsic `ZYX`,
-matching the Xsens yaw-pitch-roll convention; the previous extrinsic `zyx` model
-only agreed for single-axis motion.
+The active extended model plus smooth field-residual correction was fitted to
+198 measured poses and evaluated on 78 independent verification poses, which
+were not used by the fit. The essential physical-model convention is intrinsic
+`ZYX`, matching the Xsens yaw-pitch-roll output; the previous extrinsic `zyx`
+model only agreed for single-axis motion.
 
 | axis | median | 95th percentile |
 |---|---:|---:|
-| yaw | 1.78° | 4.01° |
-| pitch | 0.62° | 1.83° |
-| roll | 1.00° | 2.76° |
-| **worst of the three** | **2.16°** | **4.01°** |
+| yaw | 1.93° | 3.95° |
+| pitch | 0.38° | 0.86° |
+| roll | 0.31° | 0.99° |
+| **worst of the three** | **1.96°** | **3.95°** |
 
-The physical model has 0.176 mT training RMS and 0.183 mT held-yaw RMS. A
-ridge-regularized correction learns the remaining six-channel error as a smooth
-function of pose (three yaw Fourier harmonics and quadratic pitch/roll terms).
-It reduces training RMS to 0.055 mT and strictly held-yaw RMS to 0.089 mT. The
-correction coefficients are embedded in `calibrated_geometry.json`, so table
+The verification worst-axis maximum is 5.47°. Compared with the previous active
+117-pose model on the same 78 poses, worst-axis median / 95th percentile / maximum
+improved from 2.65° / 7.99° / 9.98° to 1.96° / 3.95° / 5.47°.
+
+The physical model has 0.233 mT training RMS. A ridge-regularized correction
+learns the remaining six-channel error as a smooth function of pose (three yaw
+Fourier harmonics and quadratic pitch/roll terms). Calibration-only grouped
+cross-validation selected `alpha=10`; the correction reduces training RMS to
+0.085 mT. Its coefficients are embedded in `calibrated_geometry.json`, so table
 generation and live estimation use the same corrected forward model.
 
 **Live rig observation (2026-07-16):** in the tested live 3D motions, the
