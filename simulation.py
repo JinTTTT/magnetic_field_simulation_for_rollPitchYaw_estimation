@@ -7,9 +7,9 @@ Hardware (matches the real rig, measured 2026-07-16):
     plane (the ball joint sits 20 mm below the sensor plane). Sensor 1 on the
     +x axis at (24, 0, 20); sensor 2 is 120 deg clockwise from it (top view),
     at azimuth -120 deg = (-12, -20.8, 20).
-  - Magnet: TWO identical NdFeB discs (10 mm dia x 5 mm) stacked pole-to-pole,
-    acting as one 10 mm-thick cylinder. Its N-S line points along +x (the roll
-    axis). Its center sits 15 mm above the sensor plane, i.e. at (0, 0, 35) --
+  - Magnet: ONE NdFeB disc (10 mm dia x 5 mm). Its N-S line points along +x
+    (the roll axis), N facing sensor 1 (verified by measurement 2026-07-16).
+    Its center sits 15 mm above the sensor plane, i.e. at (0, 0, 35) --
     off the pivot center along z, which is what makes roll observable.
 
 The magnet is fixed to the base; the two sensors ride the shell, so a shell
@@ -30,8 +30,8 @@ SENSOR_PLANE_Z = 20.0           # mm, sensor x-y plane sits 20 mm above the pivo
 MAGNET_Z = SENSOR_PLANE_Z + 15.0   # mm, magnet center 15 mm above the sensor plane
 
 # ---------------- the magnet --------------------------------------------------
-# dimension=(diameter, height): two 10x5 discs stacked => a 10x10 cylinder.
-magnet = magpy.magnet.Cylinder(polarization=(0, 0, 1.2), dimension=(10, 10))
+# dimension=(diameter, height): a single 10 mm dia x 5 mm disc.
+magnet = magpy.magnet.Cylinder(polarization=(0, 0, 1.2), dimension=(10, 5))
 magnet.rotate_from_angax(90, "y", anchor=(0, 0, 0))   # N-S line now along +x
 magnet.position = (0, 0, MAGNET_Z)                    # fixed to the base
 
@@ -88,7 +88,7 @@ def simulate(yaw, pitch, roll, noise=0.0):
 # ---------------- 3D visualization of the setup -------------------------------
 MAGNET_CENTER = np.array([0.0, 0.0, MAGNET_Z])
 MAGNET_RADIUS = 5.0                 # mm (10 mm diameter)
-MAGNET_HALF_LEN = 5.0               # mm (10 mm long: two 5 mm discs, N-S along x)
+MAGNET_HALF_LEN = 2.5               # mm (one 5 mm disc, N-S along x)
 
 
 def _cylinder_mesh(a, b, radius, color, n=48):
