@@ -5,9 +5,10 @@ sensors ride on the shell that rotates around it. Goal: read the shell's three
 rotation angles — **yaw, pitch, roll** — from the sensor values alone. No
 encoder, no contact.
 
-Everything here is verified in simulation (no hardware needed). Fields are
-computed with [magpylib](https://magpylib.readthedocs.io) (exact analytic field
-of a cylinder magnet); the inverse solve uses `scipy.optimize.least_squares`.
+The estimator is verified in simulation and against measured hardware data.
+Fields are computed with [magpylib](https://magpylib.readthedocs.io) (analytic
+field of a cylinder magnet); fitting and inversion use
+`scipy.optimize.least_squares`.
 
 ![the setup](figures/setup_3d.png)
 
@@ -21,7 +22,8 @@ of a cylinder magnet); the inverse solve uses `scipy.optimize.least_squares`.
 | Pivot | at the origin (0,0,0), 20 mm below the sensor plane. The magnet is fixed; the two sensors ride the shell and rotate about the pivot. |
 | Workspace | yaw ±120° (about z), pitch ±10° (about y), roll ±10° (about x). |
 
-Across the whole workspace the per-sensor field stays between **1.0 and 6.7 mT** —
+Across the current calibrated lookup table the per-sensor field stays between
+**1.26 and 10.11 mT** —
 well above the ~0.1 mT noise floor, far inside the TLV493D's ±130 mT range.
 
 **Why roll is observable.** A magnet's field is perfectly round about its own
@@ -75,6 +77,24 @@ extreme poses were the least accurate ones (at ±25° the worst-axis median was
 1.94°, 95th percentile 7.7°). Averaging N samples per reading improves all
 numbers by √N.
 
+## Current hardware result
+
+The extended model was fitted to 117 measured poses and evaluated on the older
+20-pose dataset, which was not used by the new fit. The essential correction was
+using intrinsic `ZYX`, matching the Xsens yaw-pitch-roll convention; the previous
+extrinsic `zyx` model only agreed for single-axis motion.
+
+| axis | median | 95th percentile |
+|---|---:|---:|
+| yaw | 2.52° | 5.15° |
+| pitch | 0.69° | 2.22° |
+| roll | 1.28° | 3.18° |
+| **worst of the three** | **2.68°** | **5.15°** |
+
+Training field RMS is 0.176 mT. Three-fold validation that holds out complete
+yaw planes gives 0.183 mT mean RMS, indicating that the field fit generalizes
+between sampled yaw planes.
+
 ## Run it
 
 ```bash
@@ -102,6 +122,18 @@ The live script subtracts `sensor_offsets.json`, converts the hardware readings
 from mT to T, and reports the field residual between each measurement and the
 model. Rebuild `lookup_table.npz` whenever `calibrated_geometry.json` changes.
 
+Fit a candidate, review grouped validation and verification, then activate it:
+
+```bash
+env/bin/python calibrate.py
+env/bin/python calibrate.py --mode extended --skip-cv --activate
+env/bin/python build_lookup_table.py
+```
+
+The first command writes `calibrated_geometry_candidate.json` without changing
+the live estimator. `--activate` replaces `calibrated_geometry.json`; the table
+must then be rebuilt.
+
 Collect calibration and independent verification poses with a live IMU display:
 
 ```bash
@@ -122,6 +154,7 @@ respectively, so verification poses remain separate from model fitting.
 | `simulation.py` | hardware geometry, forward field model, 3D visualization |
 | `build_lookup_table.py` | builds `lookup_table.npz` from the forward model |
 | `estimation.py` | inverse solve: 6 readings → (yaw, pitch, roll) |
+| `calibrate.py` | bounded robust fit, yaw-plane cross-validation, verification report |
 | `live_estimation.py` | recorded/live fields → estimated angles, residual, optional IMU comparison |
 | `log_calibration.py` | live IMU display and synchronized calibration-pose recording |
 | `log_verification.py` | same recorder, writing a separate verification dataset |

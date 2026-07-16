@@ -63,6 +63,12 @@ SENSOR_NOISE = 0.1e-3           # 0.1 mT of noise per axis
 # predict_readings. Without the file everything runs on the nominal drawing.
 _CHIP_ROTATIONS = (None, None)
 _IMU_MOUNT_ERR = None
+_YAW_ALIGNMENT_DEG = 0.0
+_SENSOR_GAINS = (np.ones(3), np.ones(3))
+_SENSOR_BIASES = (np.zeros(3), np.zeros(3))
+_AMBIENT_FIELD = np.zeros(3)
+_MODEL_SENSOR_HOMES = SENSOR_HOMES
+_POSE_EULER_SEQUENCE = "zyx"
 _CAL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                          "calibrated_geometry.json")
 if os.path.exists(_CAL_PATH):
@@ -77,6 +83,22 @@ if os.path.exists(_CAL_PATH):
     _CHIP_ROTATIONS = (Rotation.from_rotvec(_cal["chip_rotvec_S1"]),
                        Rotation.from_rotvec(_cal["chip_rotvec_S2"]))
     _IMU_MOUNT_ERR = Rotation.from_rotvec(_cal["imu_mount_rotvec"])
+    _YAW_ALIGNMENT_DEG = _cal.get("yaw_alignment_deg", 0.0)
+    _SENSOR_GAINS = (
+        np.asarray(_cal.get("sensor_gain_S1", [1.0, 1.0, 1.0])),
+        np.asarray(_cal.get("sensor_gain_S2", [1.0, 1.0, 1.0])),
+    )
+    _SENSOR_BIASES = (
+        np.asarray(_cal.get("sensor_bias_mT_S1", [0.0, 0.0, 0.0])) * 1e-3,
+        np.asarray(_cal.get("sensor_bias_mT_S2", [0.0, 0.0, 0.0])) * 1e-3,
+    )
+    _AMBIENT_FIELD = np.asarray(
+        _cal.get("ambient_field_mT", [0.0, 0.0, 0.0])) * 1e-3
+    _MODEL_SENSOR_HOMES = (
+        np.asarray(_cal.get("sensor_home_S1", SENSOR_1_HOME)),
+        np.asarray(_cal.get("sensor_home_S2", SENSOR_2_HOME)),
+    )
+    _POSE_EULER_SEQUENCE = _cal.get("pose_euler_sequence", "zyx")
 
 # workspace of the device (pitch/roll narrowed to +-10 deg, 2026-07-16)
 YAW_RANGE = (-120, 120)
@@ -91,16 +113,20 @@ def predict_readings(yaw, pitch, roll):
     The magnet is fixed; the shell (with the sensors) rotates, so each sensor is
     carried to rotation.apply(home) and reports the field in its own turned frame.
     """
-    rotation = Rotation.from_euler("zyx", [yaw, pitch, roll], degrees=True)
+    rotation = Rotation.from_euler(
+        _POSE_EULER_SEQUENCE,
+        [yaw + _YAW_ALIGNMENT_DEG, pitch, roll], degrees=True)
     if _IMU_MOUNT_ERR is not None:
         rotation = rotation * _IMU_MOUNT_ERR        # angles are the IMU's
     readings = []
-    for home, chip_rot in zip(SENSOR_HOMES, _CHIP_ROTATIONS):
+    for home, chip_rot, gain, bias in zip(
+            _MODEL_SENSOR_HOMES, _CHIP_ROTATIONS, _SENSOR_GAINS, _SENSOR_BIASES):
         position = rotation.apply(home)             # shell carries the sensor
-        field_world = magnet.getB(position)         # true field there (world axes)
+        field_world = magnet.getB(position) + _AMBIENT_FIELD
         field_chip = rotation.inv().apply(field_world)   # into the chip's frame
         if chip_rot is not None:
             field_chip = chip_rot.apply(field_chip)      # fitted die orientation
+        field_chip = gain * field_chip + bias
         readings.extend(field_chip)
     return np.array(readings)                        # [B1x B1y B1z B2x B2y B2z]
 
