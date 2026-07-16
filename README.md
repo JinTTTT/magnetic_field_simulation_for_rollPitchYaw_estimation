@@ -116,11 +116,14 @@ env/bin/python live_estimation.py --interactive           # ENTER for each pose
 env/bin/python live_estimation.py --verbose               # include fields and model residual
 env/bin/python live_estimation.py --compare-imu           # show Xsens truth/error
 env/bin/python live_estimation.py --replay calibration_data.csv
+env/bin/python live_3d.py                                 # estimate vs IMU in 3D
 ```
 
 The live script subtracts `sensor_offsets.json`, converts the hardware readings
 from mT to T, and reports the field residual between each measurement and the
 model. Rebuild `lookup_table.npz` whenever `calibrated_geometry.json` changes.
+Start `live_3d.py` at the mechanical home pose so its initial Xsens yaw can be
+captured as the zero reference. Close the Matplotlib window to stop acquisition.
 
 Fit a candidate, review grouped validation and verification, then activate it:
 
@@ -156,6 +159,7 @@ respectively, so verification poses remain separate from model fitting.
 | `estimation.py` | inverse solve: 6 readings → (yaw, pitch, roll) |
 | `calibrate.py` | bounded robust fit, yaw-plane cross-validation, verification report |
 | `live_estimation.py` | recorded/live fields → estimated angles, residual, optional IMU comparison |
+| `live_3d.py` | two-panel live 3D orientation: magnetic estimate and Xsens truth |
 | `log_calibration.py` | live IMU display and synchronized calibration-pose recording |
 | `log_verification.py` | same recorder, writing a separate verification dataset |
 | `lookup_table.npz` | generated (3,025 poses × 6 readings); git-ignored |
