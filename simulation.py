@@ -28,6 +28,8 @@ import numpy as np
 import magpylib as magpy
 from scipy.spatial.transform import Rotation
 
+from field_correction import predict_correction
+
 # ---------------- measured rig geometry (pivot = ball joint = origin) ---------
 SENSOR_PLANE_Z = 20.0           # mm, sensor x-y plane sits 20 mm above the pivot
 MAGNET_Z = SENSOR_PLANE_Z + 15.0   # mm, magnet center 15 mm above the sensor plane
@@ -69,6 +71,7 @@ _SENSOR_BIASES = (np.zeros(3), np.zeros(3))
 _AMBIENT_FIELD = np.zeros(3)
 _MODEL_SENSOR_HOMES = SENSOR_HOMES
 _POSE_EULER_SEQUENCE = "zyx"
+_FIELD_CORRECTION = None
 _CAL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                          "calibrated_geometry.json")
 if os.path.exists(_CAL_PATH):
@@ -99,6 +102,7 @@ if os.path.exists(_CAL_PATH):
         np.asarray(_cal.get("sensor_home_S2", SENSOR_2_HOME)),
     )
     _POSE_EULER_SEQUENCE = _cal.get("pose_euler_sequence", "zyx")
+    _FIELD_CORRECTION = _cal.get("field_correction")
 
 # workspace of the device (pitch/roll narrowed to +-10 deg, 2026-07-16)
 YAW_RANGE = (-120, 120)
@@ -128,7 +132,12 @@ def predict_readings(yaw, pitch, roll):
             field_chip = chip_rot.apply(field_chip)      # fitted die orientation
         field_chip = gain * field_chip + bias
         readings.extend(field_chip)
-    return np.array(readings)                        # [B1x B1y B1z B2x B2y B2z]
+    result = np.array(readings)                      # [B1x B1y B1z B2x B2y B2z]
+    if _FIELD_CORRECTION is not None:
+        correction_mT = predict_correction(
+            _FIELD_CORRECTION, [[yaw, pitch, roll]])[0]
+        result = result + correction_mT * 1e-3
+    return result
 
 
 def simulate(yaw, pitch, roll, noise=0.0):

@@ -20,6 +20,9 @@ from scipy.optimize import least_squares
 from scipy.spatial.transform import Rotation
 
 import simulation as sim
+from field_correction import (
+    DEFAULT_ALPHAS, fit_correction, predict_correction,
+)
 
 DATA_PATH = "calibration_data.csv"
 OFFSETS_PATH = "sensor_offsets.json"
@@ -228,7 +231,43 @@ def cross_validate(poses, measurements, x0, mode, loss, f_scale):
     print(f"  mean held-plane RMS: {np.mean(test_rms_values):.3f} mT")
 
 
-def estimate_dataset(x, mode, measurements, n_starts=5):
+def cross_validate_correction(poses, measurements, x0, mode, loss, f_scale,
+                              alphas=DEFAULT_ALPHAS):
+    """Choose correction regularization using strictly held-out yaw planes."""
+    fold_models = []
+    for levels, train, test in yaw_plane_folds(poses):
+        result, train_error = fit_model(
+            poses[train], measurements[train], x0, mode=mode, loss=loss,
+            f_scale=f_scale, max_nfev=600)
+        fold_models.append((levels, train, test, result.x, -train_error))
+
+    base_test_rms = []
+    for _, _, test, fold_x, _ in fold_models:
+        error = predict(fold_x, poses[test], mode=mode) - measurements[test]
+        base_test_rms.append(np.sqrt(np.mean(error ** 2)))
+
+    print(f"\n{mode} residual-correction yaw-plane cross-validation")
+    print(f"  physical-model mean held-plane RMS: {np.mean(base_test_rms):.3f} mT")
+    best = None
+    for alpha in alphas:
+        fold_rms = []
+        for _, train, test, fold_x, train_residual in fold_models:
+            correction = fit_correction(poses[train], train_residual, alpha)
+            corrected = (
+                predict(fold_x, poses[test], mode=mode)
+                + predict_correction(correction, poses[test]))
+            fold_rms.append(np.sqrt(np.mean(
+                (corrected - measurements[test]) ** 2)))
+        mean_rms = float(np.mean(fold_rms))
+        print(f"  alpha {alpha:7g}: held RMS {mean_rms:.3f} mT  folds "
+              + " ".join(f"{value:.3f}" for value in fold_rms))
+        if best is None or mean_rms < best[0]:
+            best = (mean_rms, alpha)
+    print(f"  selected alpha {best[1]:g}: mean held-plane RMS {best[0]:.3f} mT")
+    return best[1]
+
+
+def estimate_dataset(x, mode, measurements, correction=None, n_starts=5):
     yaw_values = np.arange(sim.YAW_RANGE[0], sim.YAW_RANGE[1] + 1, 10)
     pitch_values = np.arange(sim.PITCH_RANGE[0], sim.PITCH_RANGE[1] + 1, 2)
     roll_values = np.arange(sim.ROLL_RANGE[0], sim.ROLL_RANGE[1] + 1, 2)
@@ -238,7 +277,11 @@ def estimate_dataset(x, mode, measurements, n_starts=5):
         for pitch in pitch_values
         for roll in roll_values
     ], dtype=float)
-    grid_fields = predict(x, grid_poses, mode=mode)
+    def corrected_predict(poses):
+        return (predict(x, poses, mode=mode)
+                + predict_correction(correction, poses))
+
+    grid_fields = corrected_predict(grid_poses)
     lower = np.array([sim.YAW_RANGE[0] - 5, sim.PITCH_RANGE[0] - 5,
                       sim.ROLL_RANGE[0] - 5], dtype=float)
     upper = np.array([sim.YAW_RANGE[1] + 5, sim.PITCH_RANGE[1] + 5,
@@ -251,7 +294,7 @@ def estimate_dataset(x, mode, measurements, n_starts=5):
         best = None
         for start in starts:
             result = least_squares(
-                lambda angles: predict(x, [angles], mode=mode)[0] - measured,
+                lambda angles: corrected_predict([angles])[0] - measured,
                 start, bounds=(lower, upper), max_nfev=200)
             if best is None or result.cost < best.cost:
                 best = result
@@ -283,7 +326,7 @@ def print_angle_report(name, estimates, truth):
     return summary
 
 
-def geometry_dict(x, mode, n_poses, residual):
+def geometry_dict(x, mode, n_poses, residual, correction=None):
     yaw, biases, gains, ambient, sensor_homes = unpack_extended(x, mode)
     summary = residual_summary(residual)
     return {
@@ -307,6 +350,7 @@ def geometry_dict(x, mode, n_poses, residual):
         "sensor_home_S2": sensor_homes[1].tolist(),
         "rms_residual_mT": summary["rms_mT"],
         "n_poses": int(n_poses),
+        "field_correction": correction,
     }
 
 
@@ -328,6 +372,10 @@ def parse_args():
                         default="soft_l1")
     parser.add_argument("--f-scale", type=float, default=0.15)
     parser.add_argument("--skip-cv", action="store_true")
+    parser.add_argument("--no-correction", action="store_true",
+                        help="fit only the physical model")
+    parser.add_argument("--correction-alpha", type=float, default=None,
+                        help="override correction regularization selection")
     parser.add_argument("--activate", action="store_true",
                         help="also replace calibrated_geometry.json")
     return parser.parse_args()
@@ -371,21 +419,40 @@ def main():
     selected_mode = "extended" if "extended" in fitted else "baseline"
     selected_x, selected_residual = fitted[selected_mode]
 
-    if not args.skip_cv:
+    correction = None
+    if not args.no_correction:
+        alpha = args.correction_alpha
+        if alpha is None and not args.skip_cv:
+            alpha = cross_validate_correction(
+                poses, measurements, selected_x, selected_mode,
+                args.loss, args.f_scale)
+        if alpha is None:
+            alpha = 10.0
+        correction = fit_correction(poses, -selected_residual, alpha)
+        selected_residual = (
+            predict(selected_x, poses, mode=selected_mode)
+            + predict_correction(correction, poses) - measurements)
+        summary = residual_summary(selected_residual)
+        print(f"\ncorrected training field RMS: {summary['rms_mT']:.3f} mT "
+              f"(alpha {alpha:g})")
+    elif not args.skip_cv:
         cross_validate(
             poses, measurements, selected_x, selected_mode, args.loss, args.f_scale)
 
     verify_path = resolve_verify_path(args.verify)
     if verify_path and os.path.exists(verify_path):
         verify_poses, verify_measurements = load_data(verify_path, args.offsets)
-        estimates = estimate_dataset(selected_x, selected_mode, verify_measurements)
-        print_angle_report(f"{selected_mode} verification ({verify_path})",
+        estimates = estimate_dataset(
+            selected_x, selected_mode, verify_measurements, correction=correction)
+        label = f"{selected_mode}{'+correction' if correction else ''}"
+        print_angle_report(f"{label} verification ({verify_path})",
                            estimates, verify_poses)
     else:
         print(f"verification skipped: {verify_path} not found")
 
     geometry = geometry_dict(
-        selected_x, selected_mode, len(poses), selected_residual)
+        selected_x, selected_mode, len(poses), selected_residual,
+        correction=correction)
     write_geometry(args.output, geometry)
     if args.activate:
         write_geometry(ACTIVE_PATH, geometry)

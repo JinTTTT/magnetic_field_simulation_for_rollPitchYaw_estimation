@@ -23,7 +23,7 @@ field of a cylinder magnet); fitting and inversion use
 | Workspace | yaw ±120° (about z), pitch ±10° (about y), roll ±10° (about x). |
 
 Across the current calibrated lookup table the per-sensor field stays between
-**1.26 and 10.11 mT** —
+**1.38 and 10.43 mT** —
 well above the ~0.1 mT noise floor, far inside the TLV493D's ±130 mT range.
 
 ### Sensor range and measured fields
@@ -104,21 +104,25 @@ numbers by √N.
 
 ## Current hardware result
 
-The extended model was fitted to 117 measured poses and evaluated on the older
-20-pose dataset, which was not used by the new fit. The essential correction was
-using intrinsic `ZYX`, matching the Xsens yaw-pitch-roll convention; the previous
-extrinsic `zyx` model only agreed for single-axis motion.
+The extended model plus smooth field-residual correction was fitted to 117
+measured poses and evaluated on the older 20-pose dataset, which was not used by
+the new fit. The essential physical-model correction was using intrinsic `ZYX`,
+matching the Xsens yaw-pitch-roll convention; the previous extrinsic `zyx` model
+only agreed for single-axis motion.
 
 | axis | median | 95th percentile |
 |---|---:|---:|
-| yaw | 2.52° | 5.15° |
-| pitch | 0.69° | 2.22° |
-| roll | 1.28° | 3.18° |
-| **worst of the three** | **2.68°** | **5.15°** |
+| yaw | 1.78° | 4.01° |
+| pitch | 0.62° | 1.83° |
+| roll | 1.00° | 2.76° |
+| **worst of the three** | **2.16°** | **4.01°** |
 
-Training field RMS is 0.176 mT. Three-fold validation that holds out complete
-yaw planes gives 0.183 mT mean RMS, indicating that the field fit generalizes
-between sampled yaw planes.
+The physical model has 0.176 mT training RMS and 0.183 mT held-yaw RMS. A
+ridge-regularized correction learns the remaining six-channel error as a smooth
+function of pose (three yaw Fourier harmonics and quadratic pitch/roll terms).
+It reduces training RMS to 0.055 mT and strictly held-yaw RMS to 0.089 mT. The
+correction coefficients are embedded in `calibrated_geometry.json`, so table
+generation and live estimation use the same corrected forward model.
 
 ## Run it
 
@@ -154,7 +158,7 @@ Fit a candidate, review grouped validation and verification, then activate it:
 
 ```bash
 env/bin/python calibrate.py
-env/bin/python calibrate.py --mode extended --skip-cv --activate
+env/bin/python calibrate.py --mode extended --skip-cv --correction-alpha 10 --activate
 env/bin/python build_lookup_table.py
 ```
 
@@ -183,6 +187,7 @@ respectively, so verification poses remain separate from model fitting.
 | `build_lookup_table.py` | builds `lookup_table.npz` from the forward model |
 | `estimation.py` | inverse solve: 6 readings → (yaw, pitch, roll) |
 | `calibrate.py` | bounded robust fit, yaw-plane cross-validation, verification report |
+| `field_correction.py` | smooth regularized six-channel correction for physical-model residuals |
 | `live_estimation.py` | recorded/live fields → estimated angles, residual, optional IMU comparison |
 | `live_3d.py` | two-panel live 3D orientation: magnetic estimate and Xsens truth |
 | `log_calibration.py` | live IMU display and synchronized calibration-pose recording |

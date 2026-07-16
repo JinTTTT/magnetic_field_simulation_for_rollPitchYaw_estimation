@@ -13,6 +13,7 @@ import time
 import numpy as np
 from scipy.spatial.transform import Rotation
 
+import simulation as sim
 from live_estimation import estimate_fields, load_offsets
 
 
@@ -148,9 +149,15 @@ def build_figure():
     figure = plt.figure(figsize=(13, 6.8))
     estimated_axis = figure.add_subplot(1, 2, 1, projection="3d")
     truth_axis = figure.add_subplot(1, 2, 2, projection="3d")
-    estimated_artists = configure_panel(estimated_axis, "Magnetic estimate")
+    estimate_name = ("Magnetic estimate + correction"
+                     if sim._FIELD_CORRECTION is not None
+                     else "Magnetic estimate")
+    estimated_artists = configure_panel(estimated_axis, estimate_name)
     truth_artists = configure_panel(truth_axis, "Xsens ground truth")
-    figure.suptitle("Ball-joint orientation", fontsize=15)
+    model_status = ("residual correction active"
+                    if sim._FIELD_CORRECTION is not None
+                    else "physical model only")
+    figure.suptitle(f"Ball-joint orientation - {model_status}", fontsize=15)
     status = figure.text(0.5, 0.025, "Waiting for measurements...",
                          ha="center", fontsize=10)
     figure.subplots_adjust(left=0.03, right=0.97, bottom=0.1, top=0.88, wspace=0.08)
@@ -176,7 +183,10 @@ def run(args):
 
         set_orientation(*estimated_artists, estimate)
         set_orientation(*truth_artists, truth)
-        estimated_axis.set_title(angle_title("Magnetic estimate", estimate),
+        estimate_name = ("Magnetic estimate + correction"
+                         if sim._FIELD_CORRECTION is not None
+                         else "Magnetic estimate")
+        estimated_axis.set_title(angle_title(estimate_name, estimate),
                                  fontsize=12, pad=12)
         truth_axis.set_title(angle_title("Xsens ground truth", truth),
                              fontsize=12, pad=12)
