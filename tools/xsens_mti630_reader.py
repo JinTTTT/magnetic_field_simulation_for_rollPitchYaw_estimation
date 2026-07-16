@@ -140,6 +140,37 @@ def frames(ser):
             yield mid, payload
 
 
+# The IMU is mounted flipped on the shell: 180 deg about its x (roll) axis.
+# Undo it by right-multiplying every orientation with this fixed body-side
+# rotation, so the printed angles are the SHELL's, reading ~0 at the home pose
+# instead of ~180 roll. (Done in quaternion space -- subtracting 180 from an
+# Euler angle misbehaves at the +/-180 wrap, which is exactly where we sit.)
+MOUNT_QUAT = (0.0, 1.0, 0.0, 0.0)          # (w,x,y,z), 180 deg about x
+
+
+def quat_mult(a, b):
+    """Hamilton product of two (w,x,y,z) quaternions."""
+    w1, x1, y1, z1 = a
+    w2, x2, y2, z2 = b
+    return (w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
+            w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
+            w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
+            w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2)
+
+
+def euler_to_quat(roll, pitch, yaw):
+    """(roll,pitch,yaw) in degrees -> (w,x,y,z), zyx convention."""
+    import math
+    hr, hp, hy = (math.radians(a) / 2 for a in (roll, pitch, yaw))
+    cr, sr = math.cos(hr), math.sin(hr)
+    cp, sp = math.cos(hp), math.sin(hp)
+    cy, sy = math.cos(hy), math.sin(hy)
+    return (cy * cp * cr + sy * sp * sr,
+            cy * cp * sr - sy * sp * cr,
+            cy * sp * cr + sy * cp * sr,
+            sy * cp * cr - cy * sp * sr)
+
+
 def quat_to_rpy(q):
     """q=(w,x,y,z) -> (roll, pitch, yaw) in degrees, ENU/aerospace convention."""
     import math
@@ -183,11 +214,15 @@ def main():
                 print("# data items in stream: " + ", ".join(d.keys()))
                 described = True
 
+            quat = None
+            if isinstance(d.get("Quaternion"), list):
+                quat = d["Quaternion"]
+            elif isinstance(d.get("EulerAngles"), list):
+                quat = euler_to_quat(*d["EulerAngles"])
+
             rpy = None
-            if isinstance(d.get("EulerAngles"), list):
-                rpy = d["EulerAngles"]          # already roll,pitch,yaw (deg)
-            elif isinstance(d.get("Quaternion"), list):
-                rpy = quat_to_rpy(d["Quaternion"])
+            if quat is not None:
+                rpy = quat_to_rpy(quat_mult(quat, MOUNT_QUAT))
 
             if rpy is not None:
                 now = time.time()
