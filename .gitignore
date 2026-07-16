@@ -13,3 +13,4 @@ __pycache__/
 *.npz
 !figures/
 !figures/*.png
+env/
