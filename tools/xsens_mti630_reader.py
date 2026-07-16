@@ -147,6 +147,12 @@ def frames(ser):
 # Euler angle misbehaves at the +/-180 wrap, which is exactly where we sit.)
 MOUNT_QUAT = (0.0, 1.0, 0.0, 0.0)          # (w,x,y,z), 180 deg about x
 
+# Rig sanity test (2026-07-16): after the flip correction, yaw matched the
+# rig's convention (+ = anticlockwise from top) but pitch and roll came out
+# sign-flipped. Conjugating by a 180 deg rotation about z negates exactly
+# pitch and roll while leaving yaw untouched:  Rz(pi) R Rz(pi)^-1.
+AXIS_FIX = (0.0, 0.0, 0.0, 1.0)            # (w,x,y,z), 180 deg about z
+
 
 def quat_mult(a, b):
     """Hamilton product of two (w,x,y,z) quaternions."""
@@ -222,7 +228,9 @@ def main():
 
             rpy = None
             if quat is not None:
-                rpy = quat_to_rpy(quat_mult(quat, MOUNT_QUAT))
+                q = quat_mult(quat, MOUNT_QUAT)        # undo the mount flip
+                q = quat_mult(AXIS_FIX, quat_mult(q, AXIS_FIX))  # flip pitch+roll signs
+                rpy = quat_to_rpy(q)
 
             if rpy is not None:
                 now = time.time()
