@@ -60,5 +60,7 @@ if __name__ == "__main__":
           f"{YAW_VALUES[1]-YAW_VALUES[0]} ({len(YAW_VALUES)}),  "
           f"pitch/roll +-25 step 5 ({len(PITCH_VALUES)}/{len(ROLL_VALUES)})")
     print(f"  readings array: {readings.shape}")
+    verdict = ("inside the +-130 mT sensor range" if per_sensor_mag.max() < 130
+               else "WARNING: exceeds the +-130 mT sensor range at some poses!")
     print(f"  per-sensor |B| range: {per_sensor_mag.min():.2f} .. "
-          f"{per_sensor_mag.max():.2f} mT  (well inside the +-130 mT sensor range)")
+          f"{per_sensor_mag.max():.2f} mT  ({verdict})")

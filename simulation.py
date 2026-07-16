@@ -1,17 +1,20 @@
 #!/usr/bin/env python
 """The physical setup and the forward field model (the "simulation").
 
-Hardware (matches the real rig in figures/):
+Hardware (matches the real rig, measured 2026-07-16):
+  - Pivot: the ball joint center, at the origin. All rotations are about it.
+  - Sensors: two 3-axis TLV493D on a ring of radius 24 mm in the z = +20 mm
+    plane (the ball joint sits 20 mm below the sensor plane). Sensor 1 on the
+    +x axis at (24, 0, 20); sensor 2 is 120 deg clockwise from it (top view),
+    at azimuth -120 deg = (-12, -20.8, 20).
   - Magnet: TWO identical NdFeB discs (10 mm dia x 5 mm) stacked pole-to-pole,
     acting as one 10 mm-thick cylinder. Its N-S line points along +x (the roll
-    axis). The magnet is raised to (0, 0, 10) mm -- off the pivot center along z,
-    which is what makes roll observable.
-  - Sensors: two 3-axis TLV493D on a ring of radius 25 mm in the z = 0 plane,
-    120 deg apart in azimuth (sensor 1 "up" at +y, sensor 2 lower-right).
+    axis). Its center sits 15 mm above the sensor plane, i.e. at (0, 0, 35) --
+    off the pivot center along z, which is what makes roll observable.
 
-The pivot is at the origin. The magnet is fixed; the two sensors ride the shell,
-so a shell rotation (yaw, pitch, roll) carries the sensors to new positions and
-turns their axes with them.
+The magnet is fixed to the base; the two sensors ride the shell, so a shell
+rotation (yaw, pitch, roll) about the ball joint carries the sensors to new
+positions and turns their axes with them.
 
 This module has NO estimation code -- see estimation.py for the inverse solve.
 Run it directly to open a 3D view of the setup (magnet, field, sensors):
@@ -22,23 +25,27 @@ import numpy as np
 import magpylib as magpy
 from scipy.spatial.transform import Rotation
 
+# ---------------- measured rig geometry (pivot = ball joint = origin) ---------
+SENSOR_PLANE_Z = 20.0           # mm, sensor x-y plane sits 20 mm above the pivot
+MAGNET_Z = SENSOR_PLANE_Z + 15.0   # mm, magnet center 15 mm above the sensor plane
+
 # ---------------- the magnet --------------------------------------------------
 # dimension=(diameter, height): two 10x5 discs stacked => a 10x10 cylinder.
 magnet = magpy.magnet.Cylinder(polarization=(0, 0, 1.2), dimension=(10, 10))
 magnet.rotate_from_angax(90, "y", anchor=(0, 0, 0))   # N-S line now along +x
-magnet.position = (0, 0, 10)                          # raised 10 mm along z
+magnet.position = (0, 0, MAGNET_Z)                    # fixed to the base
 
 # ---------------- the two sensors (home positions, at zero angles) ------------
-SENSOR_RADIUS = 25.0            # mm, ring radius in the z = 0 plane
-SENSOR_1_AZIMUTH = 90.0         # deg from +x (CCW): sensor 1 sits at +y ("up")
-SENSOR_SEPARATION = 120.0       # deg between the two sensors
+SENSOR_RADIUS = 24.0            # mm, ring radius in the z = SENSOR_PLANE_Z plane
+SENSOR_1_AZIMUTH = 0.0          # deg from +x (CCW): sensor 1 sits on the +x axis
+SENSOR_SEPARATION = 120.0       # deg, sensor 2 is this far CLOCKWISE (top view)
 
 
 def _ring_point(azimuth_deg):
     a = np.radians(azimuth_deg)
     return np.array([SENSOR_RADIUS * np.cos(a),
                      SENSOR_RADIUS * np.sin(a),
-                     0.0])
+                     SENSOR_PLANE_Z])
 
 
 SENSOR_1_HOME = _ring_point(SENSOR_1_AZIMUTH)
@@ -79,7 +86,7 @@ def simulate(yaw, pitch, roll, noise=0.0):
 
 
 # ---------------- 3D visualization of the setup -------------------------------
-MAGNET_CENTER = np.array([0.0, 0.0, 10.0])
+MAGNET_CENTER = np.array([0.0, 0.0, MAGNET_Z])
 MAGNET_RADIUS = 5.0                 # mm (10 mm diameter)
 MAGNET_HALF_LEN = 5.0               # mm (10 mm long: two 5 mm discs, N-S along x)
 
@@ -135,7 +142,7 @@ def _field_line(seed, sign=1.0, step=0.5, max_steps=1200):
         if k4 is None: break
         p = p + step / 6 * (k1 + 2 * k2 + 2 * k3 + k4)
         pts.append(p.copy())
-        if inside(p) or np.abs(p).max() > 40 or p[2] < -30:
+        if inside(p) or np.abs(p - MAGNET_CENTER).max() > 40 or p[2] < -20:
             break
     return np.array(pts)
 
@@ -168,7 +175,7 @@ def build_figure():
                                  MAGNET_RADIUS, "royalblue"))     # N pole
     fig.add_trace(go.Scatter3d(
         x=[mid[0] + MAGNET_HALF_LEN + 2.5, mid[0] - MAGNET_HALF_LEN - 2.5],
-        y=[0, 0], z=[10, 10], mode="text",
+        y=[0, 0], z=[mid[2], mid[2]], mode="text",
         text=["<b>N</b>", "<b>S</b>"],
         textfont=dict(size=18, color=["royalblue", "crimson"]),
         hoverinfo="skip", showlegend=False))
@@ -182,15 +189,16 @@ def build_figure():
             mode="text", text=[f"<b>{label}</b><br>({home[0]:.0f},{home[1]:.0f},{home[2]:.0f})"],
             textfont=dict(size=12, color="black"), hoverinfo="skip", showlegend=False))
 
-    # ---- origin (0,0,0) ----
+    # ---- pivot: the ball joint center at the origin ----
     fig.add_trace(go.Scatter3d(
         x=[0], y=[0], z=[0], mode="markers+text",
         marker=dict(size=4, color="black"),
-        text=["origin (0,0,0)"], textposition="bottom center",
+        text=["pivot / ball joint (0,0,0)"], textposition="bottom center",
         hoverinfo="skip", showlegend=False))
 
     fig.update_layout(
-        title="Magnet (S=red, N=blue) at (0,0,10), N-S along x — 2 sensors 120° apart, r=25 mm",
+        title=(f"Magnet (S=red, N=blue) at (0,0,{MAGNET_Z:.0f}), N-S along x — "
+               f"2 sensors 120° apart, r={SENSOR_RADIUS:.0f} mm at z={SENSOR_PLANE_Z:.0f}"),
         showlegend=False,
         scene=dict(xaxis_title="x (mm)", yaxis_title="y (mm)", zaxis_title="z (mm)",
                    aspectmode="data",
