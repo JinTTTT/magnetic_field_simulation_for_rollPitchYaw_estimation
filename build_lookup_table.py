@@ -18,12 +18,12 @@ import numpy as np
 
 import simulation as sim
 
-# ---- the grid over the device workspace --------------------------------------
+# ---- the grid over the device workspace (ranges come from simulation.py) -----
 # coarse enough to build fast, fine enough that every real pose lands near a
 # table entry (the estimator only needs a starting guess in the right basin).
-YAW_VALUES   = np.arange(-120, 121, 10)   # -120..+120 step 10  -> 25 values
-PITCH_VALUES = np.arange(-25, 26, 5)      #  -25.. +25 step  5  -> 11 values
-ROLL_VALUES  = np.arange(-25, 26, 5)      #  -25.. +25 step  5  -> 11 values
+YAW_VALUES   = np.arange(sim.YAW_RANGE[0], sim.YAW_RANGE[1] + 1, 10)
+PITCH_VALUES = np.arange(sim.PITCH_RANGE[0], sim.PITCH_RANGE[1] + 1, 2)
+ROLL_VALUES  = np.arange(sim.ROLL_RANGE[0], sim.ROLL_RANGE[1] + 1, 2)
 
 TABLE_PATH = "lookup_table.npz"
 
@@ -58,7 +58,8 @@ if __name__ == "__main__":
     print(f"built {len(poses)} poses in {dt:.1f}s  ->  {TABLE_PATH}")
     print(f"  grid: yaw {YAW_VALUES[0]}..{YAW_VALUES[-1]} step "
           f"{YAW_VALUES[1]-YAW_VALUES[0]} ({len(YAW_VALUES)}),  "
-          f"pitch/roll +-25 step 5 ({len(PITCH_VALUES)}/{len(ROLL_VALUES)})")
+          f"pitch/roll {PITCH_VALUES[0]}..{PITCH_VALUES[-1]} step "
+          f"{PITCH_VALUES[1]-PITCH_VALUES[0]} ({len(PITCH_VALUES)}/{len(ROLL_VALUES)})")
     print(f"  readings array: {readings.shape}")
     verdict = ("inside the +-130 mT sensor range" if per_sensor_mag.max() < 130
                else "WARNING: exceeds the +-130 mT sensor range at some poses!")

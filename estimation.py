@@ -35,8 +35,9 @@ GRID_POSES = _table["poses"]        # (N, 3) [yaw, pitch, roll]
 GRID_READINGS = _table["readings"]  # (N, 6)
 
 # search bounds for least_squares: the workspace plus a small margin
-LOWER = [-125, -30, -30]
-UPPER = [125, 30, 30]
+MARGIN = 5
+LOWER = [sim.YAW_RANGE[0] - MARGIN, sim.PITCH_RANGE[0] - MARGIN, sim.ROLL_RANGE[0] - MARGIN]
+UPPER = [sim.YAW_RANGE[1] + MARGIN, sim.PITCH_RANGE[1] + MARGIN, sim.ROLL_RANGE[1] + MARGIN]
 
 
 def estimate(measured, seed=None, n_starts=3):
@@ -79,9 +80,9 @@ if __name__ == "__main__":
 
     errors = []
     for _ in range(10):
-        yaw = rng.uniform(-120, 120)
-        pitch = rng.uniform(-25, 25)
-        roll = rng.uniform(-25, 25)
+        yaw = rng.uniform(*sim.YAW_RANGE)
+        pitch = rng.uniform(*sim.PITCH_RANGE)
+        roll = rng.uniform(*sim.ROLL_RANGE)
 
         measured = sim.simulate(yaw, pitch, roll, noise=sim.SENSOR_NOISE)
         est = estimate(measured)

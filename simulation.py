@@ -54,10 +54,10 @@ SENSOR_HOMES = (SENSOR_1_HOME, SENSOR_2_HOME)
 
 SENSOR_NOISE = 0.1e-3           # 0.1 mT of noise per axis
 
-# workspace of the device
+# workspace of the device (pitch/roll narrowed to +-10 deg, 2026-07-16)
 YAW_RANGE = (-120, 120)
-PITCH_RANGE = (-25, 25)
-ROLL_RANGE = (-25, 25)
+PITCH_RANGE = (-10, 10)
+ROLL_RANGE = (-10, 10)
 
 
 # ---------------- forward direction: angles -> readings -----------------------

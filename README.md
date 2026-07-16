@@ -15,14 +15,14 @@ of a cylinder magnet); the inverse solve uses `scipy.optimize.least_squares`.
 
 | Part | Details |
 |---|---|
-| Magnet | two NdFeB discs (10 mm dia × 5 mm, N35) stacked pole-to-pole → one 10 mm-thick cylinder, ~1.2 T. Its **N–S line points along +x** (the roll axis). |
-| Position | raised to **(0, 0, 10) mm** — off the pivot center. This offset is what makes roll observable (see below). |
-| Sensors | 2 × Infineon TLV493D (±130 mT range, ~0.1 mT noise/axis), on a ring of **radius 25 mm** in the z = 0 plane, **120° apart** in azimuth. |
-| Pivot | at the origin (0,0,0). The magnet is fixed; the two sensors ride the shell and rotate about the pivot. |
-| Workspace | yaw ±120° (about z), pitch ±25° (about y), roll ±25° (about x). |
+| Magnet | one NdFeB disc (10 mm dia × 5 mm, N35), ~1.2 T. Its **N–S line points along +x** (the roll axis). |
+| Position | at **(0, 0, 35) mm** — 15 mm above the sensor plane, off the pivot center. This offset is what makes roll observable (see below). |
+| Sensors | 2 × Infineon TLV493D (±130 mT range, ~0.1 mT noise/axis), on a ring of **radius 24 mm** in the z = +20 mm plane, **120° apart** in azimuth. |
+| Pivot | at the origin (0,0,0), 20 mm below the sensor plane. The magnet is fixed; the two sensors ride the shell and rotate about the pivot. |
+| Workspace | yaw ±120° (about z), pitch ±10° (about y), roll ±10° (about x). |
 
-Across the whole workspace the per-sensor field stays between **2.5 and 15 mT** —
-strong enough for sub-degree signal, far inside the TLV493D's ±130 mT range.
+Across the whole workspace the per-sensor field stays between **1.0 and 6.7 mT** —
+well above the ~0.1 mT noise floor, far inside the TLV493D's ±130 mT range.
 
 **Why roll is observable.** A magnet's field is perfectly round about its own
 N–S line. If the magnet sat exactly at the pivot, rolling the shell about that
@@ -46,7 +46,7 @@ report at that pose: the shell carries each sensor to `rotation.apply(home)`, th
 magnet's field there is computed, then rotated back into the chip's own frame.
 
 **2. Lookup table — `build_lookup_table.py`.**
-Sweeps a grid (yaw −120…120 step 10°, pitch & roll ±25 step 5° → **3,025 poses**)
+Sweeps a grid (yaw −120…120 step 10°, pitch & roll ±10 step 2° → **3,025 poses**)
 and stores each pose's 6 readings in `lookup_table.npz`. Rebuild any time the
 geometry changes.
 
@@ -59,18 +59,21 @@ geometry changes.
 
 In a tracking loop, pass the previous frame's answer as `seed` to skip the table.
 
-## Accuracy (simulation, 0.1 mT noise, whole workspace)
+## Accuracy (simulation, 0.1 mT noise, whole workspace, 300 random poses)
 
 | axis | median | 95th percentile |
 |---|---|---|
-| yaw | 0.51° | 1.69° |
-| pitch | 0.43° | 1.41° |
-| roll | 0.64° | 2.04° |
-| **worst of the three** | **1.00°** | **2.22°** (worst seen ≈ 3.6°) |
+| yaw | 1.44° | 4.72° |
+| pitch | 0.52° | 1.69° |
+| roll | 0.51° | 1.50° |
+| **worst of the three** | **1.49°** | **4.72°** (worst seen ≈ 8.0°) |
 
-No look-alikes anywhere (0 of 500 random poses missed). ~58 ms per cold-start
-estimate in plain Python; far faster in tracking mode (`seed=` skips the lookup).
-Roll is the weakest axis, as expected — it rides on the off-center offset alone.
+Yaw is the weakest axis with the single-magnet geometry: the field is only a
+few mT at the sensors, so 0.1 mT of noise costs more degrees. Narrowing
+pitch/roll from ±25° to ±10° (2026-07-16) improved every axis — the excluded
+extreme poses were the least accurate ones (at ±25° the worst-axis median was
+1.94°, 95th percentile 7.7°). Averaging N samples per reading improves all
+numbers by √N.
 
 ## Run it
 

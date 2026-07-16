@@ -92,11 +92,11 @@ cheaply, scale only if it works:
 | **B reduced** | ~19 | 9 params (offsets + magnet pos) | prove the pipeline end-to-end |
 | **C full** | ~50 | all 24 params | production accuracy + trustworthy residual |
 
-- **Stage A** — one axis at a time: `(0,0,0)`, `(±90,0,0)`, `(0,±25,0)`,
-  `(0,0,±25)`. Compare the *nominal* model's prediction to the measurement.
-  The `(0,0,±25)` roll pair is make-or-break: readings must actually change.
+- **Stage A** — one axis at a time: `(0,0,0)`, `(±90,0,0)`, `(0,±10,0)`,
+  `(0,0,±10)`. Compare the *nominal* model's prediction to the measurement.
+  The `(0,0,±10)` roll pair is make-or-break: readings must actually change.
 - **Stage B** — add range + combinations: yaw `±120,±60`; pitch/roll mids
-  `±12`; corners `(±120,±25,±25)`, `(±60,∓25,±25)`. Keep 2–3 poses **held out**.
+  `±5`; corners `(±120,±10,±10)`, `(±60,∓10,±10)`. Keep 2–3 poses **held out**.
 - **Stage C** — fill the interior and all 8 corners; keep a held-out set.
 
 Rule of thumb: **~3–10× more readings (6/pose) than free parameters.**
