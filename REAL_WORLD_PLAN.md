@@ -1,163 +1,199 @@
-# From simulation to the real device
+# Clean calibration and estimation plan
 
-Fit the physical model to the real rig, then build the lookup table from that
-fitted model. Ground truth comes from an **Xsens MTi-620 (VRU) on the shell**.
+## Goal
 
-**Why no magnet-swap is needed:** MEMS accel/gyro are immune to magnetic fields,
-so the onboard fusion never lets the magnet corrupt the pose:
-- **roll & pitch** — from gravity, drift-free, read directly with the magnet in.
-- **yaw** — not perturbed by the magnet. On a gyro-only (**VRU**) heading profile
-  the magnetometer is ignored outright; on an **AHRS** profile the XKF3 filter
-  treats the magnet as a magnetic **disturbance** and rejects it, trusting the
-  gyro for heading. *Confirmed empirically on the MTi-630:* moving a magnet around
-  the unit does not move the reported yaw. The cost either way is that yaw is
-  effectively free-running gyro and slowly **drifts** — bound it by **re-zeroing
-  at a mechanical home stop** every few poses and keeping sessions short (MTi gyro
-  drift is small, <~1° over a few minutes).
+Build a reproducible pipeline that estimates yaw, pitch, and roll from two
+TLV493D magnetic sensors and one fixed magnet.
 
-> **Caveat — confirm with the magnet *mounted*, not just waved.** What's verified
-> so far is rejection of a *moving* magnet (a transient). A permanently mounted
-> magnet is a *sustained* field, which an AHRS profile could in principle slowly
-> trust. Before relying on this: hold a fixed pose for **~60 s with the magnet in**
-> and confirm yaw doesn't creep. If it does, switch the MTi to a **VRU/gyro-only**
-> profile, which removes the magnetometer from the heading solution entirely.
+The existing implementation has already proved that the approach works. This
+branch starts a new calibration cycle with new data and a clearly separated
+workflow. Existing calibration files are treated as legacy results and are not
+inputs to the new fit.
 
-Do the phases in order; don't advance until the **gate** passes.
+## Fixed conventions
 
-| # | Phase | Gate |
-|---|---|---|
-| 0 | Hardware bring-up | readings stable after averaging |
-| 1 | Test magnet mount | reinsertion spread < 0.1 mT |
-| 2 | Calibrate sensors + IMU | magnet-out reading ≈ 0; yaw re-zero repeatable |
-| 3 | Collect data (staged A→B→C) | Stage A sane; Stage B recovers angles |
-| 4 | Fit the model | residual → sensor noise (~0.1–0.2 mT) |
-| 5 | Build the table | \|B\| range matches measurement |
-| 6 | Verify | median error within ~2× the sim's ~1° |
+- Angles are always stored and reported as `yaw, pitch, roll` in degrees.
+- The pose convention is intrinsic `ZYX`.
+- Magnetic fields are recorded in mT. The model may convert them to T internally.
+- The mechanical home pose is `(yaw, pitch, roll) = (0, 0, 0)`.
+- The Xsens IMU continues to provide roll, pitch, and yaw.
+- Roll and pitch are used directly from the IMU.
+- Only yaw is referenced at startup: hold the rig at mechanical home, average
+  the IMU yaw as `yaw0`, then use `wrap180(yaw_raw - yaw0)` for the whole session.
+- `yaw0` is captured once at the beginning of a recording or live session and
+  is never changed in the middle of that session.
+- Calibration and verification data never share fitted parameters or residual
+  correction training.
+- Raw measurements are preserved. Corrections are applied during processing,
+  not written back into raw data.
 
----
+## Step-by-step workflow
 
-## Phase 0 — Hardware bring-up
-- Both TLV493D on one I²C bus (two addresses); confirm Bx,By,Bz in mT.
-- Mount the MTi-620 rigidly on the shell, its axes aligned to the joint frame.
-  Stream orientation (roll/pitch/yaw) via MT Manager / the Xsens API.
-- Set up a **home stop** at (0,0,0) — a repeatable mechanical detent used to
-  re-zero the drifting yaw.
-- Average **8–16 samples** per magnetic reading. Log **temperature**.
+### 1. Freeze the proof of concept
 
-**Gate:** static magnetic readings stable to ≤ 0.05 mT; IMU roll/pitch to ≤ 0.2°.
+Keep the current working implementation and results as the feasibility
+baseline. Develop the clean pipeline on this branch without changing the old
+measurements.
 
-## Phase 1 — Test the magnet mount (critical)
-Everything assumes the magnet returns to the exact same pose each time.
-- Build a **keyed/socketed** mount (not free-hand).
-- Hold the shell fixed; record the 6 numbers, remove + reinsert the magnet,
-  record again — **repeat 5–10×**.
-- Compute each channel's spread (max − min).
+**Output:** a known baseline that can always be reproduced and compared.
 
-**Gate:** spread < 0.1 mT (good) or < 0.3 mT (usable, ~1° extra error).
-This number is the floor on your final accuracy.
+### 2. Record measured geometry as priors
 
-## Phase 2 — Calibrate sensors + IMU
-- **Sensor offset:** magnet out, record each TLV493D's reading as its offset `b0`;
-  subtract from all later readings.
-- **IMU:** no magnetometer calibration needed (the MTi-620 doesn't use it). Just
-  verify the **yaw re-zero**: return to the home stop, reset yaw to 0, and check
-  it reads ~0 each time you come back to the stop.
+Measure and record:
 
-**Gate:** magnet-out reading ≈ 0 (≤ 0.1 mT); yaw reads ~0 at the home stop to
-≤ 0.3° across repeats.
+- Pivot and sensor positions
+- Magnet position and dimensions
+- Sensor mounting directions
+- Magnet direction and approximate strength
+- IMU mounting direction
+- Measurement uncertainty for every dimension
 
-## Phase 3 — Collect calibration data
-No magnet swapping — the magnet stays in the whole time (it doesn't affect the
-MTi-620). Just manage yaw drift with the home stop.
+These values are initial guesses and fitting priors, not unquestioned exact
+geometry.
 
-**Per pose:**
-1. **Re-zero yaw** at the home stop (do this every few poses to bound drift).
-2. Move to a pose and **hold it fixed**.
-3. Record `yaw,pitch,roll` from the MTi-620 **and** `B1x…B2z` from the two
-   sensors (average 8–16) — at the same instant.
-4. Every so often, return to the home stop and confirm yaw is still ~0; if it has
-   drifted, re-zero and redo the poses since the last good re-zero.
+**Output:** `geometry_priors.json`.
 
-**CSV** (`calibration_data.csv`):
-```
-pose_id, yaw_truth, pitch_truth, roll_truth, B1x,B1y,B1z, B2x,B2y,B2z, temp_C
-```
+### 3. Calibrate the magnetic sensors without the main magnet
 
-**Collect in stages — don't record 50+ poses up front.** Prove the approach
-cheaply, scale only if it works:
+Remove the main magnet and record both sensors at multiple known orientations.
+Use these measurements to estimate:
 
-| stage | poses | fits | purpose |
-|---|---|---|---|
-| **A sanity** | 7 | nothing | catch gross bugs (sign/axis/units) |
-| **B reduced** | ~19 | 9 params (offsets + magnet pos) | prove the pipeline end-to-end |
-| **C full** | ~50 | all 24 params | production accuracy + trustworthy residual |
+- Constant per-channel sensor bias
+- Relative channel gains and axis alignment where observable
+- The world-frame ambient magnetic field
+- Static noise and repeatability
 
-- **Stage A** — one axis at a time: `(0,0,0)`, `(±90,0,0)`, `(0,±10,0)`,
-  `(0,0,±10)`. Compare the *nominal* model's prediction to the measurement.
-  The `(0,0,±10)` roll pair is make-or-break: readings must actually change.
-- **Stage B** — add range + combinations: yaw `±120,±60`; pitch/roll mids
-  `±5`; corners `(±120,±10,±10)`, `(±60,∓10,±10)`. Keep 2–3 poses **held out**.
-- **Stage C** — fill the interior and all 8 corners; keep a held-out set.
+Do not subtract one home-pose magnetic vector from every orientation. The
+ambient field is fixed in the world but changes direction in a rotating sensor's
+frame, so it must be modeled using the known pose.
 
-Rule of thumb: **~3–10× more readings (6/pose) than free parameters.**
+**Output:** raw magnet-out data and `sensor_calibration.json`.
 
-**Gate:** Stage A predictions sane; Stage B `estimate()` roughly recovers angles.
+**Gate:** the calibrated magnet-out model predicts held-out magnet-out readings
+near the measured sensor noise.
 
-## Phase 4 — Fit the model
-Fit the geometry parameters so predictions match the data (same `least_squares`
-engine as `estimate()`, but the unknowns are the geometry, not the angles):
+### 4. Establish the IMU yaw reference
 
-| parameters | count | start (Stage) |
-|---|---|---|
-| sensor offsets (×2) | 6 | B |
-| magnet position | 3 | B |
-| magnet N–S tilt (2) + strength (1) | 3 | C |
-| sensor position + orientation (×2) | 12 | C |
+Place the rig at the mechanical `(0, 0, 0)` home pose and keep it still.
 
-Minimize `Σ ‖predict_readings(p, pose_j) − measured_j‖²`, starting from the
-nominal values in `simulation.py`. **Fix the gauge:** pivot at origin, home = zero;
-trust magnet strength *or* sensor gain, not both. Note the true parameters need
-not be recovered exactly — only a model that predicts the readings.
+1. Average several IMU yaw samples to obtain `yaw0`.
+2. Use `wrap180(yaw_raw - yaw0)` as yaw.
+3. Use the IMU pitch and roll values directly.
+4. Store `yaw0` and a session ID with every dataset.
+5. Do not re-zero yaw during that session.
 
-**Gate (health check):** RMS residual near sensor noise (~0.1–0.2 mT). Much
-larger → something unmodeled (steel nearby, tilted magnet, bad offset). Fix it.
+Repeat the startup procedure for each new recording or live session because the
+physical home pose is the reference, not a permanent raw IMU heading value.
 
-> Validated in simulation: a fake rig (magnet shifted 1 mm/tilted 2–3°, sensors
-> mis-mounted with offsets) fit from 19 poses drops the residual 0.82 → 0.08 mT,
-> and cuts estimation error from ~10° (nominal) to ~1.5° (fitted).
+**Gate:** repeated starts at mechanical home report yaw close to zero and have
+acceptable short-term drift.
 
-Output: `calibrated_geometry.json`.
+### 5. Install the magnet and test mount repeatability
 
-## Phase 5 — Build the table
-Load the fitted geometry, run `build_lookup_table.py` → `lookup_table.npz` from
-the **calibrated** model. Nothing else in the estimator changes.
+Install the magnet in its final keyed mount. At a fixed pose, remove and
+reinstall it several times and compare all six sensor channels.
 
-**Gate:** table builds; |B| range matches Phase 3 measurements.
+**Output:** a magnet-mount repeatability report.
 
-## Phase 6 — Verify
-On ~15–30 **fresh** poses (not used in the fit), run `estimate(measured)` and
-compare to IMU truth. Report per-axis and worst-axis error (median, 95th, worst).
+**Gate:** reinsertion variation is below the chosen magnetic error budget.
 
-**Gate:** median worst-axis error within ~2× the simulated ~1°. Roll is the weak
-axis; more averaging or a better mount helps it most.
+### 6. Record a new calibration dataset
 
-## Deploy
-Cold start uses the table; then track with `estimate(measured, seed=previous)`.
-Average 4–8 samples per estimate; operate near the calibration temperature; keep
-ferrous objects away.
+With the magnet installed:
 
----
+1. Start at mechanical home and capture `yaw0` once.
+2. Cover the full yaw, pitch, and roll workspace, including edges and combined
+   rotations.
+3. At each pose, record synchronized IMU angles and magnetic samples.
+4. Save means, standard deviations, sample count, timestamps, temperature,
+   session ID, and `yaw0`.
 
-## Scripts to build
+Only this new dataset is used to fit the physical model.
 
-| Script | Phase | Purpose |
-|---|---|---|
-| `mount_test.py` | 1 | log reinsertions, report per-channel spread |
-| `log_calibration.py` | 3 | log MTi-620 pose + both sensors per pose → CSV |
-| `log_verification.py` | 6 | record fresh held-out poses to a separate CSV |
-| `predict_readings(params, pose)` | 4 | refactor `simulation.py` to make geometry fittable |
-| `calibrate.py` | 4 | fit params, print residual, save `calibrated_geometry.json` |
-| `verify.py` | 6 | estimate on held-out poses, report accuracy |
+**Output:** a new raw calibration dataset.
 
-`simulation.py` / `build_lookup_table.py` / `estimation.py` stay the backbone;
-calibration just swaps nominal geometry for fitted geometry.
+### 7. Record untouched verification data
+
+Record verification data in a separate acquisition session using the same
+startup yaw procedure, units, and pose convention. Cover the full workspace and
+include combined rotations.
+
+Do not use these measurements for fitting, choosing priors, selecting residual
+features, or tuning regularization.
+
+**Output:** a new raw verification dataset.
+
+### 8. Fit the physical model
+
+For every calibration pose, compare the six measured magnetic channels with the
+six channels predicted by the forward model. Optimize the physical parameters
+to minimize that difference.
+
+Fit appropriate parameters such as:
+
+- Magnet position, direction, and effective strength
+- Sensor positions and mounting rotations
+- IMU-to-rig alignment terms if needed
+- Sensor calibration and ambient-field terms not already fixed by Step 3
+
+Measured geometry supplies the initial values and uncertainty-weighted prior
+penalties. The calibration data determines the final fitted values.
+
+**Output:** a fitted physical-model candidate and calibration residual report.
+
+**Gate:** fitted values remain physically plausible and the field residual is
+close to the measured noise level.
+
+### 9. Fit the residual correction
+
+After the physical model is fixed, fit a smooth pose-dependent correction to its
+remaining six-channel error. Use only calibration data and select its
+regularization with grouped cross-validation.
+
+The correction must improve held-out calibration groups, not only training
+error.
+
+**Output:** a physical model plus residual-correction candidate.
+
+### 10. Evaluate once on verification data
+
+Lock the model and correction before opening the verification result. Report:
+
+- Median, 95th percentile, and maximum error for yaw, pitch, and roll
+- Median, 95th percentile, and maximum worst-axis error
+- Magnetic-model residuals
+- Results grouped by recording session and workspace region
+
+If the model is changed after examining verification results, that verification
+set becomes development data and a new untouched set must be recorded.
+
+**Output:** the final verification report and an accepted or rejected model.
+
+### 11. Build a versioned lookup table
+
+Build the pose-to-field table only from the accepted model. Store model and
+sensor-calibration identifiers with the table so stale combinations are
+rejected automatically.
+
+**Output:** a versioned `lookup_table.npz`.
+
+### 12. Run live estimation
+
+At startup:
+
+1. Place the rig at mechanical home.
+2. Capture `yaw0` once for the IMU comparison.
+3. Load the accepted sensor calibration, physical model, residual correction,
+   and matching lookup table.
+4. Apply the same units, channel order, angle order, and rotation convention
+   used during recording and fitting.
+5. Estimate continuously, using the previous estimate as the tracking seed.
+
+Display the magnetic estimate, IMU reference, per-axis error, and magnetic-model
+residual.
+
+## Work rule
+
+Complete and review one step before implementing the next. Do not collect the
+new magnet-in calibration dataset until the magnet-out sensor calibration and
+IMU yaw convention have both passed their gates.

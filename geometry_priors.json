@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "status": "draft_requires_remeasurement",
+  "purpose": "Directly measured or nominal rig values used only as initial guesses and fitting priors. This file contains no fitted calibration results.",
+  "coordinate_system": {
+    "origin": "ball-joint pivot",
+    "axes": {
+      "x": "roll axis; sensor 1 side at mechanical home",
+      "y": "pitch axis",
+      "z": "yaw axis; from pivot toward sensor plane"
+    },
+    "pose_order": [
+      "yaw",
+      "pitch",
+      "roll"
+    ],
+    "pose_euler_sequence": "ZYX",
+    "angle_unit": "degree",
+    "length_unit": "mm",
+    "field_unit": "mT"
+  },
+  "workspace_deg": {
+    "yaw": [-120.0, 120.0],
+    "pitch": [-10.0, 10.0],
+    "roll": [-10.0, 10.0],
+    "source": "demonstrated operating workspace from the proof-of-concept rig"
+  },
+  "pivot": {
+    "position_mm": [0.0, 0.0, 0.0],
+    "uncertainty_mm": [0.0, 0.0, 0.0],
+    "source": "coordinate-system definition"
+  },
+  "sensors": {
+    "model": "Infineon TLV493D",
+    "sensor_plane_z_mm": {
+      "value": 20.0,
+      "uncertainty": null,
+      "source": "proof-of-concept rig measurement; re-measure before fitting"
+    },
+    "ring_radius_mm": {
+      "value": 24.0,
+      "uncertainty": null,
+      "source": "proof-of-concept rig measurement; re-measure before fitting"
+    },
+    "angular_separation_deg": {
+      "value": 120.0,
+      "uncertainty": null,
+      "source": "mechanical layout; re-measure before fitting"
+    },
+    "sensor_1": {
+      "home_position_mm": [24.0, 0.0, 20.0],
+      "position_uncertainty_mm": null,
+      "position_source": "derived from recorded radius, plane height, and zero-degree azimuth",
+      "chip_rotation_prior": null
+    },
+    "sensor_2": {
+      "home_position_mm": [-12.0, -20.7846096908, 20.0],
+      "position_uncertainty_mm": null,
+      "position_source": "derived from recorded radius, plane height, and -120-degree azimuth",
+      "chip_rotation_prior": null
+    },
+    "note": "Old fitted chip rotations, gains, biases, and sensor offsets are deliberately excluded. They must be obtained by the new calibration workflow."
+  },
+  "magnet": {
+    "type": "NdFeB disc",
+    "grade": "N35",
+    "diameter_mm": {
+      "value": 10.0,
+      "uncertainty": null,
+      "source": "magnet specification; verify the installed part"
+    },
+    "height_mm": {
+      "value": 5.0,
+      "uncertainty": null,
+      "source": "magnet specification; verify the installed part"
+    },
+    "home_center_position_mm": {
+      "value": [0.0, 0.0, 35.0],
+      "uncertainty": null,
+      "source": "proof-of-concept nominal measurement: 15 mm above the 20 mm sensor plane; re-measure before fitting"
+    },
+    "axis_direction_at_home": {
+      "value": [1.0, 0.0, 0.0],
+      "uncertainty_deg": null,
+      "source": "observed magnet polarity along +x; re-check after final installation"
+    },
+    "nominal_polarization_T": {
+      "value": 1.2,
+      "uncertainty": null,
+      "source": "nominal modeling value, not a direct field measurement"
+    }
+  },
+  "imu": {
+    "model": "Xsens MTi-630",
+    "mount_rotation_prior": null,
+    "note": "Do not copy the old fitted IMU mount rotation. Validate the reader axis convention and startup yaw reference during the IMU step."
+  },
+  "required_before_model_fitting": [
+    "Re-measure all entries whose uncertainty is null.",
+    "Record the measurement method and uncertainty for each physical value.",
+    "Complete the new magnet-out sensor calibration.",
+    "Validate the IMU yaw-at-home convention."
+  ]
+}

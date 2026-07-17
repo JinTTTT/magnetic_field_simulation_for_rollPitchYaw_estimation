@@ -19,9 +19,11 @@ MTData2). Reference: MT_Low-Level_Documentation.pdf
   - Format nibble: precision 0=Float32 1=Fp1220 2=Fp1632 3=Float64
                    coord     0=ENU 4=NED 8=NWU   (floats are big-endian)
 
-The MTi-630 is an AHRS: its YAW is magnetometer-referenced, so a nearby magnet
-will disturb it -- use an independent reference (e.g. ArUco) for yaw ground
-truth. Roll/pitch remain reliable.
+This is a low-level hardware reader. The clean pipeline defines session yaw at
+the mechanical home pose: average the initial IMU yaw as yaw0, then use wrapped
+(yaw - yaw0) for the complete session. Roll and pitch are used directly after
+the rig's fixed mount/axis conversion below. Validate this convention before
+recording new calibration data.
 
 Usage:
     python3 xsens_mti630_reader.py [--port /dev/ttyUSB0] [--baud 921600]
@@ -204,8 +206,7 @@ def main():
         csv.write("t_host,packet,roll_deg,pitch_deg,yaw_deg\n")
 
     print(f"# port={args.port} baud={args.baud} MID=MTData2(0x36)")
-    print(f"# {'roll':>8} {'pitch':>8} {'yaw':>8}   (deg)   "
-          f"[MTi-630 yaw is magnetometer-referenced]")
+    print(f"# {'roll':>8} {'pitch':>8} {'yaw':>8}   (deg, raw session reference)")
 
     t0 = time.time()
     described = False
