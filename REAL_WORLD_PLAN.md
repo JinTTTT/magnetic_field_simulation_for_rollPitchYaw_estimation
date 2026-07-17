@@ -26,6 +26,8 @@ inputs to the new fit.
   correction training.
 - Raw measurements are preserved. Corrections are applied during processing,
   not written back into raw data.
+- Every TLV493D reading must pass the shared complete-frame check (`CHANNEL = 0`)
+  before it can enter calibration, verification, fitting, or live estimation.
 
 ## Step-by-step workflow
 

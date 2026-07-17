@@ -1,0 +1,147 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-07-17T10:20:11.188731+00:00",
+  "test_type": "coherent_tlv493d_pose_stability",
+  "channel_order": [
+    "S1_Bx",
+    "S1_By",
+    "S1_Bz",
+    "S2_Bx",
+    "S2_By",
+    "S2_Bz"
+  ],
+  "field_unit": "mT",
+  "sensor_reader": {
+    "type": "tlv493d_a1b6_complete_frame_v1",
+    "coherence_rule": "accept only frames with CHANNEL status equal to zero"
+  },
+  "acquisition": {
+    "sensor_1_i2c_bus": 3,
+    "sensor_2_i2c_bus": 4,
+    "samples_per_pose": 128,
+    "sample_delay_s": 0.03,
+    "settle_time_per_pose_s": 2.0,
+    "discarded_priming_reads_per_pose": 1,
+    "raw_samples_file": "sensor_stability_samples.csv"
+  },
+  "acceptance": {
+    "maximum_allowed_channel_stddev_mT": 0.2,
+    "passed": true
+  },
+  "poses": [
+    {
+      "pose": "home",
+      "means_mT": {
+        "S1": [
+          0.215140625,
+          -4.0524531249999995,
+          1.689734375
+        ],
+        "S2": [
+          -1.694328125,
+          2.29840625,
+          -0.75184375
+        ]
+      },
+      "stddev_mT": {
+        "S1": [
+          0.10145669215906,
+          0.13279128489659328,
+          0.12465849313792192
+        ],
+        "S2": [
+          0.09538179470848211,
+          0.10205181928264502,
+          0.08962410016680034
+        ]
+      },
+      "min_mT": {
+        "S1": [
+          0.0,
+          -4.312,
+          1.47
+        ],
+        "S2": [
+          -1.862,
+          2.058,
+          -0.98
+        ]
+      },
+      "max_mT": {
+        "S1": [
+          0.49,
+          -3.626,
+          1.96
+        ],
+        "S2": [
+          -1.47,
+          2.548,
+          -0.588
+        ]
+      },
+      "rejected_incomplete_frames": {
+        "S1": 0,
+        "S2": 0
+      },
+      "maximum_stddev_mT": 0.13279128489659328,
+      "passed": true
+    },
+    {
+      "pose": "yaw_plus_90",
+      "means_mT": {
+        "S1": [
+          2.20653125,
+          -0.11484375,
+          0.10871875
+        ],
+        "S2": [
+          -0.79625,
+          -2.88640625,
+          1.18365625
+        ]
+      },
+      "stddev_mT": {
+        "S1": [
+          0.134147993108798,
+          0.11802965312051049,
+          0.11746769953085344
+        ],
+        "S2": [
+          0.10999785252019749,
+          0.1085162230696006,
+          0.09088094119473535
+        ]
+      },
+      "min_mT": {
+        "S1": [
+          1.96,
+          -0.392,
+          -0.098
+        ],
+        "S2": [
+          -1.078,
+          -3.234,
+          0.882
+        ]
+      },
+      "max_mT": {
+        "S1": [
+          2.548,
+          0.196,
+          0.392
+        ],
+        "S2": [
+          -0.49,
+          -2.646,
+          1.372
+        ]
+      },
+      "rejected_incomplete_frames": {
+        "S1": 0,
+        "S2": 0
+      },
+      "maximum_stddev_mT": 0.134147993108798,
+      "passed": true
+    }
+  ]
+}

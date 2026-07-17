@@ -17,26 +17,16 @@ from pathlib import Path
 import statistics
 import time
 
+from tools.tlv493d_coherent import (
+    COHERENCE_RULE,
+    READER_TYPE,
+    open_sensor_pair,
+    prime_sensor_pair,
+    read_pair_mT,
+)
+
 
 CHANNELS = ("S1_Bx", "S1_By", "S1_Bz", "S2_Bx", "S2_By", "S2_Bz")
-
-
-def open_sensors(bus1, bus2):
-    """Open the two TLV493D sensors on their independent I2C buses."""
-    from adafruit_extended_bus import ExtendedI2C
-    import adafruit_tlv493d
-
-    i2c_buses = [ExtendedI2C(bus1), ExtendedI2C(bus2)]
-    sensors = [adafruit_tlv493d.TLV493D(bus) for bus in i2c_buses]
-    return i2c_buses, sensors
-
-
-def read_fields_mT(sensors):
-    """Return [S1 Bx,By,Bz, S2 Bx,By,Bz] in mT."""
-    fields = []
-    for sensor in sensors:
-        fields.extend(value_uT / 1000.0 for value_uT in sensor.magnetic)
-    return fields
 
 
 def acquire(sensors, batches, samples_per_batch, sample_delay, batch_delay):
@@ -45,7 +35,7 @@ def acquire(sensors, batches, samples_per_batch, sample_delay, batch_delay):
     started = time.monotonic()
     for batch_index in range(batches):
         for sample_index in range(samples_per_batch):
-            fields = read_fields_mT(sensors)
+            fields = read_pair_mT(sensors)
             elapsed = time.monotonic() - started
             rows.append((batch_index, sample_index, elapsed, *fields))
             if sample_delay:
@@ -102,6 +92,10 @@ def write_result_json(path, args, means, stddevs, batch_means, batch_spreads):
         "schema_version": 1,
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "calibration_type": "static_home_pose_magnet_out_offset",
+        "sensor_reader": {
+            "type": READER_TYPE,
+            "coherence_rule": COHERENCE_RULE,
+        },
         "assumption": "The six magnet-out channel values are static and are subtracted from every later reading.",
         "conditions": {
             "main_magnet": "removed_and_kept_far_from_rig",
@@ -186,10 +180,11 @@ def main():
             print("cancelled")
             return
 
-    _i2c_buses, sensors = open_sensors(args.bus1, args.bus2)
+    _i2c_buses, sensors = open_sensor_pair(args.bus1, args.bus2)
     print(f"sensors opened on I2C buses {args.bus1} and {args.bus2}")
     print(f"settling for {args.settle_seconds:g} s...")
     time.sleep(args.settle_seconds)
+    prime_sensor_pair(sensors)
 
     rows = acquire(
         sensors,

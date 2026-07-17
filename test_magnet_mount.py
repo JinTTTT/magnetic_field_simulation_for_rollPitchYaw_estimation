@@ -10,6 +10,13 @@ from pathlib import Path
 import statistics
 import time
 
+from tools.tlv493d_coherent import (
+    READER_TYPE,
+    open_sensor_pair,
+    prime_sensor_pair,
+    read_pair_mT,
+)
+
 
 CHANNELS = ("S1_Bx", "S1_By", "S1_Bz", "S2_Bx", "S2_By", "S2_Bz")
 
@@ -17,6 +24,11 @@ CHANNELS = ("S1_Bx", "S1_By", "S1_Bz", "S2_Bx", "S2_By", "S2_Bz")
 def load_offsets(path):
     with path.open() as source:
         data = json.load(source)
+    if data.get("sensor_reader", {}).get("type") != READER_TYPE:
+        raise ValueError(
+            f"{path} predates the coherent TLV493D reader; "
+            "repeat measure_sensor_offsets.py first"
+        )
     try:
         offsets = data["offsets_mT"]["S1"] + data["offsets_mT"]["S2"]
     except (KeyError, TypeError) as error:
@@ -26,26 +38,10 @@ def load_offsets(path):
     return [float(value) for value in offsets], data
 
 
-def open_sensors(bus1, bus2):
-    from adafruit_extended_bus import ExtendedI2C
-    import adafruit_tlv493d
-
-    i2c_buses = [ExtendedI2C(bus1), ExtendedI2C(bus2)]
-    sensors = [adafruit_tlv493d.TLV493D(bus) for bus in i2c_buses]
-    return i2c_buses, sensors
-
-
-def read_fields_mT(sensors):
-    fields = []
-    for sensor in sensors:
-        fields.extend(value_uT / 1000.0 for value_uT in sensor.magnetic)
-    return fields
-
-
 def acquire_trial(sensors, trial_index, samples, sample_delay, offsets, started):
     rows = []
     for sample_index in range(samples):
-        raw = read_fields_mT(sensors)
+        raw = read_pair_mT(sensors)
         corrected = [value - offset for value, offset in zip(raw, offsets)]
         rows.append((trial_index, sample_index, time.monotonic() - started,
                      *raw, *corrected))
@@ -172,7 +168,7 @@ def parse_args():
 def main():
     args = parse_args()
     offsets, offsets_data = load_offsets(args.offsets)
-    _i2c_buses, sensors = open_sensors(args.bus1, args.bus2)
+    _i2c_buses, sensors = open_sensor_pair(args.bus1, args.bus2)
     print("Magnet-mount repeatability test")
     print(f"target: every channel spread <= {args.max_spread_mT:g} mT")
 
@@ -189,6 +185,7 @@ def main():
                 return
         print(f"settling for {args.settle_seconds:g} s...")
         time.sleep(args.settle_seconds)
+        prime_sensor_pair(sensors)
         trial_rows = acquire_trial(
             sensors, trial_index, args.samples, args.sample_delay, offsets, started
         )

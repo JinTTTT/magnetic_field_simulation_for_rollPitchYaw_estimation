@@ -9,9 +9,10 @@ code, fitted models, lookup table, and recorded datasets remain available on the
 
 ## Current status
 
-The clean workflow and geometry priors are defined. New static sensor offsets
-and the home IMU yaw reference have been recorded. No new magnet-in calibration
-dataset, fitted model, or lookup table exists yet on this branch.
+The clean workflow, geometry priors, and home IMU yaw reference are defined. A
+coherent TLV493D reader now rejects incomplete conversion frames. Magnetic
+offsets, mount results, and calibration rows recorded before this reader must be
+repeated after its stability test passes.
 
 The carried-over geometry in `geometry_priors.json` has been checked by the
 user. The next task is the magnet-out sensor calibration.
@@ -27,11 +28,22 @@ user. The next task is the magnet-out sensor calibration.
   saves their circular mean yaw as `yaw0`
 - `test_magnet_mount.py` — measures corrected home fields across repeated magnet
   installations and reports their per-channel spread
+- `record_calibration_data.py` — interactively records synchronized IMU poses
+  and raw/corrected magnetic measurements for physical-model fitting
+- `tools/tlv493d_coherent.py` — shared frame-validated TLV493D-A1B6 reader
+- `test_sensor_stability.py` — compares coherent magnetic noise at home and
+  approximately +90° yaw before accepting new calibration measurements
 - `tools/read_tlv493d.py` — basic two-sensor hardware check
 - `tools/xsens_mti630_reader.py` — low-level Xsens orientation reader
 
 New scripts and data formats will be added one step at a time after the previous
 step passes its gate.
+
+All magnetic acquisition scripts use the shared coherent reader. A TLV493D
+register snapshot is accepted only when its `CHANNEL` status is zero, indicating
+that Bx, By, and Bz belong to one complete measurement frame. After every pose
+change, one coherent pre-trigger frame is discarded and the code waits for a
+fresh conversion before averaging begins.
 
 ## Pose convention
 
@@ -60,6 +72,19 @@ sample to `sensor_offset_samples.csv` and writes the six means and stability
 statistics to `sensor_offsets.json`. Existing outputs are not overwritten
 unless `--force` is supplied.
 
+## Validate coherent sensor stability
+
+With the magnet installed, run:
+
+```bash
+env/bin/python test_sensor_stability.py
+```
+
+Follow the prompts for mechanical home and approximately +90° yaw. The test
+preserves magnetic values, frame counters, retry counts, and raw register bytes.
+Both poses must remain below the default 0.2 mT per-channel standard-deviation
+limit before recording new offsets, mount results, or calibration poses.
+
 ## Measure the IMU yaw reference
 
 Keep the rig stationary at mechanical home and run:
@@ -85,3 +110,16 @@ and press ENTER. Remove the magnet again before the next trial. The script loads
 `sensor_offsets.json`, preserves all readings in `magnet_mount_samples.csv`, and
 writes the corrected-field repeatability report to `magnet_mount_test.json`.
 The default acceptance limit is 0.1 mT on every channel.
+
+## Record calibration poses
+
+Leave the accepted magnet installation in place and run:
+
+```bash
+env/bin/python record_calibration_data.py
+```
+
+The recorder loads `sensor_offsets.json` and `imu_yaw_reference.json`, displays
+the current yaw/pitch/roll continuously, and records one synchronized averaged
+pose whenever ENTER is pressed. Type `q` then ENTER to stop. Data is appended to
+`calibration_data.csv`; an existing file must have the exact current schema.
