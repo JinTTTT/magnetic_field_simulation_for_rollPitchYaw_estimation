@@ -5,8 +5,8 @@ Same decomposition as compensate_verification_yaw.py: the discrepancy between
 the magnetic estimate and the yaw label is split into a piecewise-linear
 function of time e(t) (heading wander) and a zero-mean per-station term
 (pose-dependent model error). Labels are compensated with e(t) only, and e(t)
-is forced to zero mean so the session's average frame is preserved (the
-constant frame offset stays in yaw_zero_correction.json).
+is forced to zero mean so the session's average frame is preserved. A legacy
+constant frame offset may be supplied explicitly.
 
 Intended use is iterative: compensate against the current model, refit the
 model on the compensated labels, and repeat until e(t) stops changing.
@@ -34,9 +34,10 @@ def parse_args():
     parser.add_argument("--calibration", type=Path,
                         default=Path("calibration_data.csv"))
     parser.add_argument("--model", type=Path, default=Path("physical_model.json"))
-    parser.add_argument("--correction", type=Path,
-                        default=Path("yaw_zero_correction.json"),
-                        help="ignored if the file does not exist (model frame)")
+    parser.add_argument(
+        "--correction", type=Path, default=None,
+        help="optional yaw correction for a legacy rotated-frame model",
+    )
     parser.add_argument("--output", type=Path,
                         default=Path("calibration_data_heading_compensated.csv"))
     parser.add_argument("--summary-output", type=Path,
@@ -123,7 +124,9 @@ def main():
         "yaw_imu_original_deg", "heading_error_estimate_deg",
     ]
     with args.output.open("w", newline="") as output:
-        writer = csv.DictWriter(output, fieldnames=fieldnames)
+        writer = csv.DictWriter(
+            output, fieldnames=fieldnames, lineterminator="\n"
+        )
         writer.writeheader()
         for position, row_index in enumerate(order):
             row = dict(rows[row_index])

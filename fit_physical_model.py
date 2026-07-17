@@ -383,7 +383,7 @@ def jacobian_diagnostics(jacobian):
 def write_predictions(path, rows, measured, predicted):
     residual = predicted - measured
     with path.open("w", newline="") as output:
-        writer = csv.writer(output)
+        writer = csv.writer(output, lineterminator="\n")
         writer.writerow((
             "pose_id", "session_id", "yaw_deg", "pitch_deg", "roll_deg",
             *(f"{name}_measured_mT" for name in CHANNELS),

@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-07-17T20:26:43.518933+00:00",
+  "derivation_type": "constant_model_frame_to_dial_frame_yaw_conversion",
+  "yaw_rule": "yaw_deg = wrap180(yaw_model_frame_deg - offset_deg)",
+  "offset_deg": 5.381888050929966,
+  "rows": 332,
+  "inputs": {
+    "source_path": "calibration_data_heading_compensated_iter3.csv",
+    "source_sha256": "94efd62f0fc269d99d8002fac055d57e9c569c73a68465d0f5970d97642c35c1",
+    "correction_path": "yaw_zero_correction_model_frame_backup.json",
+    "correction_sha256": "a23a063bfdfd4a1fda54a31522ddbf130acf80fdb74685d2740ea701b92b8768",
+    "model_path": "physical_model_model_frame_backup.json",
+    "model_sha256": "d5ae9c985962c6a2ca67b76e9dfc4db1ef3af8a319463bfafdfc926f30f3cf0a"
+  },
+  "output": {
+    "path": "calibration_data_dial_aligned.csv",
+    "sha256": "00da7e27f8d148d3e68bf389b4f4cf498b4e2a524112f1fba6b56e711cd30d05"
+  }
+}

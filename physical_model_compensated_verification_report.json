@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
-  "created_at_utc": "2026-07-17T19:49:06.427208+00:00",
+  "created_at_utc": "2026-07-17T20:27:13.300186+00:00",
   "report_type": "labeled_dataset_evaluation",
   "status_note": "diagnostic evaluation of a supplied dataset; not untouched holdout evidence",
   "residual_correction_active": false,
   "inputs": {
     "data_path": "verification_data_yaw_compensated.csv",
-    "data_sha256": "7785585d1f63ab0074b9ad3a7a47f675191d007dc1e0bef58c1b4c8938c83cd6",
+    "data_sha256": "a885565efaf925c3cc266ee95f6b73dab7f1c34fda6ea739fe63303f57170467",
     "rows": 60,
     "yaw_truth_column": "yaw_compensated_deg",
     "model_path": "physical_model.json",
-    "model_sha256": "d5ae9c985962c6a2ca67b76e9dfc4db1ef3af8a319463bfafdfc926f30f3cf0a",
-    "yaw_zero_offset_deg": 5.381888050929966
+    "model_sha256": "544a2a8b424dbe36a6203c96666aed7513cbcb0e57b43e9659276e58edfe481a",
+    "yaw_zero_offset_deg": 0.0
   },
   "method": {
     "truth_used_as_estimator_seed": false,
@@ -24,46 +24,46 @@
   },
   "angle_error_deg": {
     "yaw": {
-      "mae": 0.32036911370365717,
-      "rmse": 0.40259724898849153,
-      "median_absolute": 0.26139559832917314,
-      "p95_absolute": 0.8306276904720761,
-      "maximum_absolute": 0.8527349689648531
+      "mae": 0.3202202386314473,
+      "rmse": 0.4024503198467634,
+      "median_absolute": 0.2612571972655644,
+      "p95_absolute": 0.8304738926753984,
+      "maximum_absolute": 0.8524998874875394
     },
     "pitch": {
-      "mae": 0.34225441044911165,
-      "rmse": 0.4613218815451218,
-      "median_absolute": 0.23608004510500447,
-      "p95_absolute": 0.9115419606201464,
-      "maximum_absolute": 1.4495227338346393
+      "mae": 0.34222790648113166,
+      "rmse": 0.4612879846789884,
+      "median_absolute": 0.23607313360679516,
+      "p95_absolute": 0.9114884459960061,
+      "maximum_absolute": 1.44924767109607
     },
     "roll": {
-      "mae": 0.6020275150689908,
-      "rmse": 0.8152572346424305,
-      "median_absolute": 0.42603411266445956,
-      "p95_absolute": 1.777155448434319,
-      "maximum_absolute": 2.324229789499964
+      "mae": 0.6021102533410442,
+      "rmse": 0.8152661721905768,
+      "median_absolute": 0.4261016144659955,
+      "p95_absolute": 1.7769742289147112,
+      "maximum_absolute": 2.3241347191542685
     }
   },
   "worst_axis_error_deg": {
-    "mae": 0.7351295635097453,
-    "rmse": 0.8810779375982761,
-    "median_absolute": 0.6098965932881568,
-    "p95_absolute": 1.777155448434319,
-    "maximum_absolute": 2.324229789499964
+    "mae": 0.7350932528866989,
+    "rmse": 0.8810337567168653,
+    "median_absolute": 0.6100049347659193,
+    "p95_absolute": 1.7769742289147112,
+    "maximum_absolute": 2.3241347191542685
   },
   "euclidean_angle_error_deg": {
-    "mae": 0.8568696938688694,
-    "rmse": 1.0195816700599594,
-    "median_absolute": 0.691472961989271,
-    "p95_absolute": 1.995790214520163,
-    "maximum_absolute": 2.7563277535548516
+    "mae": 0.8568303958711468,
+    "rmse": 1.01951547132559,
+    "median_absolute": 0.6916490030811331,
+    "p95_absolute": 1.9954388913635395,
+    "maximum_absolute": 2.7561296780578846
   },
   "optimized_field_rms_mT": {
-    "mae": 0.03400187153669601,
-    "rmse": 0.03702114675597777,
-    "median_absolute": 0.032279799093422004,
-    "p95_absolute": 0.058534356489191086,
-    "maximum_absolute": 0.07562903859993175
+    "mae": 0.0340043275674774,
+    "rmse": 0.03702394361923169,
+    "median_absolute": 0.03227884210302609,
+    "p95_absolute": 0.05853905752249837,
+    "maximum_absolute": 0.07564082076529294
   }
 }

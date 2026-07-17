@@ -96,10 +96,22 @@ def main():
     for role, path in paths.items():
         files[role] = describe(path, role, POLICIES[role])
 
+    calibration_columns = files["calibration"].get("columns", [])
+    dial_aligned = "yaw_model_frame_deg" in calibration_columns
+    if dial_aligned:
+        files["calibration"]["derivation"] = (
+            "heading-compensated yaw labels converted to the mechanical dial "
+            "frame; see calibration_dial_alignment.json"
+        )
+
     manifest = {
         "schema_version": 1,
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
-        "purpose": "Freeze clean-pipeline inputs before any physical-model fitting.",
+        "purpose": (
+            "Freeze dial-frame physical-model fitting inputs."
+            if dial_aligned else
+            "Freeze clean-pipeline inputs before any physical-model fitting."
+        ),
         "separation_policy": {
             "calibration": "May be used for fitting and calibration-only diagnostics.",
             "verification": (

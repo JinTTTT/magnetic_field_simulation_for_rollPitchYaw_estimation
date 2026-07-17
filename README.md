@@ -8,32 +8,32 @@ the magnetic sensors only.
 ## Current status
 
 The accepted model (`physical_model.json`) was fitted on 332 calibration poses
-whose IMU yaw labels were first cleaned of heading wander (see below). Field
-residual: 0.122 mT RMSE against 0.108 mT sensor noise. Accuracy on the 60-pose
-verification set (heading-compensated labels): yaw MAE 0.32°, pitch 0.34°,
-roll 0.60°; worst single error 2.3°. A 6-pose check against the mechanical
-dial confirms absolute yaw within ±0.6° (the +60° edge pose is the weak spot
-at ~1°).
+whose IMU yaw labels were first cleaned of heading wander and then converted
+to the mechanical dial frame. Field residual: 0.122 mT RMSE against 0.108 mT
+sensor noise. Accuracy on the 60-pose verification set (heading-compensated
+labels): yaw MAE 0.32°, pitch 0.34°, roll 0.60°; worst single error 2.3°.
+The six mechanical dial poses have a mean constant yaw offset of 0.00027°
+without runtime correction (yaw MAE 0.47°, worst 1.40° at the +60° edge).
 
 **Key lesson:** the MTi-630 heading is magnetometer-aided and wanders several
 degrees near the rig magnet (≈7.5° swing during the calibration hour). IMU
-yaw is therefore not usable as an absolute reference over time. The pipeline
-handles this with two artifacts:
+yaw is therefore not usable as an absolute reference over time. The current
+pipeline handles the first-cycle data with two explicit derivations:
 
-- `yaw_zero_correction.json` — the constant rotation (+5.38°) between the
-  model's calibration frame and the mechanical dial frame, measured from poses
-  at known dial angles (`yaw_bias_diagnostic.csv`). `PhysicalModelEstimator`
-  auto-loads it (SHA-locked to the model) and reports dial-frame yaw.
 - `calibration_heading_wander.json` — the smooth-in-time heading error removed
-  from the calibration labels before fitting (three compensate/refit
-  iterations, converged).
+  from the calibration labels (three compensate/refit iterations, converged).
+- `calibration_data_dial_aligned.csv` — the compensated labels with the
+  measured +5.381888° model-to-dial origin offset subtracted before the final
+  refit. `calibration_dial_alignment.json` records its provenance.
 
-The next calibration cycle should take yaw labels from the mechanical dial
-directly, which makes both artifacts unnecessary. Pitch and roll from the IMU
-are gravity-referenced and remain trustworthy.
+The model therefore reports mechanical-dial yaw natively and uses no runtime
+yaw offset. The next calibration cycle should still take every yaw label from
+the mechanical dial directly: a constant conversion aligns the origin but
+cannot repair pose-by-pose IMU label error. Pitch and roll from the IMU are
+gravity-referenced and remain trustworthy.
 
-The pre-refit model, correction, and manifest are kept as `*_v1_backup.*`;
-copying them over the defaults rolls everything back.
+The immediately preceding rotated-frame model, correction, and manifest are
+kept as `*_model_frame_backup.*`; older artifacts remain as `*_v1_backup.*`.
 
 ## Pose convention
 
@@ -55,8 +55,10 @@ Pipeline scripts, in workflow order:
 - `fit_physical_model.py` — fits the model from the locked calibration data
 - `compensate_calibration_yaw.py` — removes IMU heading wander from calibration
   yaw labels (iterate with refitting until converged)
+- `align_calibration_yaw_to_dial.py` — converts the converged compensated yaw
+  labels to the mechanical dial frame while preserving the source values
 - `fit_yaw_zero_correction.py` — measures the model-frame→dial-frame offset
-  from poses at known dial angles
+  from poses at known dial angles; now used as a zero-offset diagnostic
 - `compensate_verification_yaw.py` — same wander removal for verification data
 - `evaluate_physical_model.py` — evaluator; locked-holdout mode by default,
   `--data`/`--yaw-column` for other labeled sets
@@ -71,10 +73,11 @@ Support: `physical_model.py` (forward model), `physical_estimator.py`
 `geometry_priors.json`, `tools/` (TLV493D coherent reader, Xsens reader).
 
 Data and evidence: `calibration_data.csv` (raw, original IMU labels),
-`calibration_data_heading_compensated_iter3.csv` (fitting labels; manifest
-entry), `verification_data.csv` (+ `_yaw_compensated`), `yaw_bias_diagnostic.csv`
-(dial poses), sensor/mount/IMU raw sample files, and the fit/verification
-reports named `physical_model_*`.
+`calibration_data_heading_compensated_iter3.csv` (wander-corrected intermediate),
+`calibration_data_dial_aligned.csv` (current fitting labels; manifest entry),
+`verification_data.csv` (+ `_yaw_compensated`), `yaw_bias_diagnostic.csv` (dial
+poses), sensor/mount/IMU raw sample files, and the fit/verification reports
+named `physical_model_*`.
 
 ## Workflows
 
@@ -101,7 +104,10 @@ Fit and calibrate the frame:
 env/bin/python freeze_datasets.py           # lock dataset hashes
 env/bin/python fit_physical_model.py        # fit from locked calibration only
 env/bin/python compensate_calibration_yaw.py  # then refit; repeat until stable
-env/bin/python fit_yaw_zero_correction.py   # needs poses at known dial angles
+env/bin/python align_calibration_yaw_to_dial.py --force
+env/bin/python freeze_datasets.py --calibration calibration_data_dial_aligned.csv --force
+env/bin/python fit_physical_model.py --force
+env/bin/python fit_yaw_zero_correction.py --force  # diagnostic should be near zero
 ```
 
 Report performance on the verification data (compensation + evaluation):

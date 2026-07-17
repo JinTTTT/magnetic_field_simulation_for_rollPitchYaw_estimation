@@ -46,11 +46,13 @@ Each step gates the next; each writes raw samples plus a JSON report.
    and refit, repeating until the wander estimate stops changing (first cycle:
    3 iterations, final update 0.1° rms). *Next cycle: record the dial angle
    as the yaw label and skip this.*
-7. **Dial-frame yaw correction** (`fit_yaw_zero_correction.py`) — a few poses
-   at known dial angles give the constant model-frame→dial-frame offset,
-   stored SHA-locked in `yaw_zero_correction.json` and auto-applied by the
-   estimator. Re-fit whenever the model is refit or anything rotates
-   mechanically. Unnecessary once calibration is dial-labeled.
+7. **Dial-frame alignment** — a few poses at known dial angles let
+   `fit_yaw_zero_correction.py` measure any constant model-frame→dial-frame
+   offset. For the first-cycle IMU-labeled data,
+   `align_calibration_yaw_to_dial.py` applies that offset to a derived dataset
+   before the final refit. Run the dial check again afterward: the remaining
+   mean offset should be near zero, with no runtime correction. This conversion
+   is unnecessary when every calibration yaw is dial-labeled directly.
 8. **Verification** (`verify_model.py`, wrapping
    `compensate_verification_yaw.py` + `evaluate_physical_model.py`) —
    separate session, never used in fitting. IMU-labeled sets need heading
@@ -62,12 +64,14 @@ Each step gates the next; each writes raw samples plus a JSON report.
 
 ## Status after the first cycle (2026-07-17)
 
-- Model fitted on 332 heading-compensated poses: 0.122 mT RMSE
-  (noise 0.108 mT).
+- Model fitted on 332 heading-compensated, dial-aligned poses: 0.122 mT RMSE
+  (noise 0.108 mT); no runtime yaw offset.
 - Verification (60 poses, compensated labels): yaw MAE 0.32°, pitch 0.34°,
   roll 0.60°; worst single error 2.3°.
-- Dial check (6 poses): absolute yaw within ±0.6°, ~1° at the +60° edge.
-- Pre-refit artifacts kept as `*_v1_backup.*`.
+- Dial check (6 poses): mean offset 0.00027°, yaw MAE 0.47°, worst 1.40° at
+  the +60° edge.
+- Rotated-frame artifacts kept as `*_model_frame_backup.*`; older artifacts
+  remain as `*_v1_backup.*`.
 
 ## Next steps, in order of value
 

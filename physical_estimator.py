@@ -12,7 +12,9 @@ from physical_model import load_model, predict_mT
 
 
 def load_yaw_zero_offset(correction_path, model_path):
-    """Load the model-frame-to-dial-frame yaw offset fitted for this model."""
+    """Load an optional legacy model-frame-to-dial-frame yaw offset."""
+    if correction_path is None:
+        return 0.0
     correction_path = Path(correction_path)
     if not correction_path.exists():
         return 0.0
@@ -34,14 +36,14 @@ def load_yaw_zero_offset(correction_path, model_path):
 class PhysicalModelEstimator:
     """Coarse global field search followed by bounded nonlinear refinement.
 
-    Poses are searched and reported in the mechanical dial frame; the model is
-    evaluated at yaw + yaw_zero_offset_deg because its calibration labels are
-    rotated from that frame by a constant heading error.
+    Poses are searched and reported in the mechanical dial frame. Current
+    models are fitted in that frame directly; ``correction_path`` remains
+    available only for legacy models fitted in a rotated yaw frame.
     """
 
     def __init__(self, model_path=Path("physical_model.json"),
                  geometry_path=Path("geometry_priors.json"),
-                 correction_path=Path("yaw_zero_correction.json"),
+                 correction_path=None,
                  yaw_step_deg=10.0, tilt_step_deg=5.0):
         self.model = load_model(model_path)
         if not self.model.get("calibration_gate_passed", False):

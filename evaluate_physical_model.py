@@ -7,8 +7,8 @@ for example the heading-compensated verification set with
 --yaw-column yaw_compensated_deg; that mode is for diagnostics, not final
 holdout evidence, and the report says so.
 
-Estimates are reported in the dial frame whenever yaw_zero_correction.json is
-present, so the truth labels must be in the dial frame too.
+Current models report the dial frame natively. ``--correction`` is available
+only when evaluating a legacy model fitted in a rotated yaw frame.
 """
 
 import argparse
@@ -53,8 +53,10 @@ def parse_args():
     parser.add_argument("--yaw-column", default="yaw_deg",
                         help="truth yaw column, e.g. yaw_compensated_deg")
     parser.add_argument("--model", type=Path, default=Path("physical_model.json"))
-    parser.add_argument("--correction", type=Path,
-                        default=Path("yaw_zero_correction.json"))
+    parser.add_argument(
+        "--correction", type=Path, default=None,
+        help="optional yaw correction for a legacy rotated-frame model",
+    )
     parser.add_argument("--output", type=Path,
                         default=Path("physical_model_verification_report.json"))
     parser.add_argument("--predictions-output", type=Path,
@@ -169,7 +171,7 @@ def main():
     }
 
     with args.predictions_output.open("w", newline="") as output:
-        writer = csv.writer(output)
+        writer = csv.writer(output, lineterminator="\n")
         writer.writerow((
             "pose_id", "session_id",
             "yaw_truth_deg", "pitch_truth_deg", "roll_truth_deg",

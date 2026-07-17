@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "created_at_utc": "2026-07-17T20:26:43.607219+00:00",
-  "purpose": "Freeze dial-frame physical-model fitting inputs.",
+  "created_at_utc": "2026-07-17T12:49:00.298164+00:00",
+  "purpose": "Variant manifest for the heading-compensated refit; verification entry unchanged and still untouched by fitting.",
   "separation_policy": {
     "calibration": "May be used for fitting and calibration-only diagnostics.",
     "verification": "Must not be loaded by fitting, feature selection, residual training, regularization selection, or model acceptance before final evaluation."
@@ -10,9 +10,9 @@
     "calibration": {
       "role": "calibration",
       "policy": "physical_fit_and_residual_training",
-      "path": "calibration_data_dial_aligned.csv",
-      "size_bytes": 118254,
-      "sha256": "00da7e27f8d148d3e68bf389b4f4cf498b4e2a524112f1fba6b56e711cd30d05",
+      "path": "calibration_data_heading_compensated_iter3.csv",
+      "size_bytes": 110110,
+      "sha256": "94efd62f0fc269d99d8002fac055d57e9c569c73a68465d0f5970d97642c35c1",
       "rows": 332,
       "columns": [
         "pose_id",
@@ -47,15 +47,13 @@
         "S2_By_corrected_mT",
         "S2_Bz_corrected_mT",
         "yaw_imu_original_deg",
-        "heading_error_estimate_deg",
-        "yaw_model_frame_deg",
-        "dial_frame_offset_applied_deg"
+        "heading_error_estimate_deg"
       ],
       "session_ids": [
         "cal-20260717T104800Z",
         "cal-grid-repair-01"
       ],
-      "derivation": "heading-compensated yaw labels converted to the mechanical dial frame; see calibration_dial_alignment.json"
+      "derivation": "calibration_data.csv with IMU heading wander removed from yaw_deg by compensate_calibration_yaw.py; original label kept in yaw_imu_original_deg"
     },
     "verification": {
       "role": "verification",

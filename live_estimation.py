@@ -55,8 +55,11 @@ class MagneticPoseSource:
         self.error = None
 
     def start(self):
-        print(f"yaw zero correction: {self.estimator.yaw_zero_offset_deg:+.3f} deg "
-              "(dial frame)")
+        if abs(self.estimator.yaw_zero_offset_deg) < 5e-4:
+            print("magnetic model yaw frame: mechanical dial (no runtime offset)")
+        else:
+            print(f"magnetic model-to-dial yaw offset: "
+                  f"{self.estimator.yaw_zero_offset_deg:+.3f} deg")
         print(f"coarse estimator grid: {len(self.estimator.grid_poses)} poses")
         self.thread.start()
 
@@ -145,8 +148,10 @@ def run(args):
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", type=Path, default=Path("physical_model.json"))
-    parser.add_argument("--correction", type=Path,
-                        default=Path("yaw_zero_correction.json"))
+    parser.add_argument(
+        "--correction", type=Path, default=None,
+        help="optional yaw correction for a legacy rotated-frame model",
+    )
     parser.add_argument("--geometry", type=Path, default=Path("geometry_priors.json"))
     parser.add_argument("--manifest", type=Path, default=Path("dataset_manifest.json"))
     parser.add_argument("--offsets", type=Path, default=Path("sensor_offsets.json"))

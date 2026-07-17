@@ -47,8 +47,10 @@ def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data", type=Path, default=Path("verification_data.csv"))
     parser.add_argument("--model", type=Path, default=Path("physical_model.json"))
-    parser.add_argument("--correction", type=Path,
-                        default=Path("yaw_zero_correction.json"))
+    parser.add_argument(
+        "--correction", type=Path, default=None,
+        help="optional yaw correction for a legacy rotated-frame model",
+    )
     parser.add_argument("--output", type=Path,
                         default=Path("verification_data_yaw_compensated.csv"))
     parser.add_argument("--knot-spacing-s", type=float, default=90.0)
@@ -91,7 +93,7 @@ def main():
     )
     estimator.widen_yaw_bounds(args.yaw_margin_deg)
     print(f"estimating {len(rows)} poses "
-          f"(yaw zero correction {estimator.yaw_zero_offset_deg:+.3f} deg, "
+          f"(runtime yaw offset {estimator.yaw_zero_offset_deg:+.3f} deg, "
           f"yaw search bounds ±{args.yaw_margin_deg:.0f} deg widened)...")
     estimates = np.array([
         estimator.estimate(field, global_starts=args.global_starts)["angles_deg"]
@@ -140,7 +142,9 @@ def main():
         "yaw_magnetic_estimate_deg",
     ]
     with args.output.open("w", newline="") as output:
-        writer = csv.DictWriter(output, fieldnames=fieldnames)
+        writer = csv.DictWriter(
+            output, fieldnames=fieldnames, lineterminator="\n"
+        )
         writer.writeheader()
         for row, error, label, estimate in zip(
                 rows, heading_error, compensated, estimates[:, 0]):

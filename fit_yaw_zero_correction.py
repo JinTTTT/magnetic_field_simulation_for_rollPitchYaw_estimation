@@ -54,7 +54,10 @@ def parse_args():
                         help="comma-separated dial yaw per row of --data")
     parser.add_argument("--model", type=Path, default=Path("physical_model.json"))
     parser.add_argument("--geometry", type=Path, default=Path("geometry_priors.json"))
-    parser.add_argument("--output", type=Path, default=Path("yaw_zero_correction.json"))
+    parser.add_argument(
+        "--output", type=Path, default=Path("dial_frame_yaw_diagnostic.json"),
+        help="diagnostic offset report; current runtime does not auto-load it",
+    )
     parser.add_argument("--force", action="store_true")
     return parser.parse_args()
 
