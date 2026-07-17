@@ -1,140 +1,87 @@
-# Magnetic orientation estimation
+# Magnetic pose estimation
 
-Estimates ball-joint yaw, pitch, and roll from one fixed magnet and two 3-axis
-TLV493D sensors, using a fitted finite-cylinder physical model. An Xsens
-MTi-630 provides pitch/roll labels during calibration; live estimation needs
-the magnetic sensors only.
+Estimates ball-joint yaw, pitch, and roll from two TLV493D magnetic sensors and
+one fixed magnet. The final model reports yaw directly in the mechanical dial
+frame; no runtime yaw correction is applied.
 
-## Current status
+## Run
 
-The accepted model (`physical_model.json`) was fitted on 332 calibration poses
-whose IMU yaw labels were first cleaned of heading wander and then converted
-to the mechanical dial frame. Field residual: 0.122 mT RMSE against 0.108 mT
-sensor noise. Accuracy on the 60-pose verification set (heading-compensated
-labels): yaw MAE 0.32°, pitch 0.34°, roll 0.60°; worst single error 2.3°.
-The six mechanical dial poses have a mean constant yaw offset of 0.00027°
-without runtime correction (yaw MAE 0.47°, worst 1.40° at the +60° edge).
-
-**Key lesson:** the MTi-630 heading is magnetometer-aided and wanders several
-degrees near the rig magnet (≈7.5° swing during the calibration hour). IMU
-yaw is therefore not usable as an absolute reference over time. The current
-pipeline handles the first-cycle data with two explicit derivations:
-
-- `calibration_heading_wander.json` — the smooth-in-time heading error removed
-  from the calibration labels (three compensate/refit iterations, converged).
-- `calibration_data_dial_aligned.csv` — the compensated labels with the
-  measured +5.381888° model-to-dial origin offset subtracted before the final
-  refit. `calibration_dial_alignment.json` records its provenance.
-
-The model therefore reports mechanical-dial yaw natively and uses no runtime
-yaw offset. The next calibration cycle should still take every yaw label from
-the mechanical dial directly: a constant conversion aligns the origin but
-cannot repair pose-by-pose IMU label error. Pitch and roll from the IMU are
-gravity-referenced and remain trustworthy.
-
-The immediately preceding rotated-frame model, correction, and manifest are
-kept as `*_model_frame_backup.*`; older artifacts remain as `*_v1_backup.*`.
-
-## Pose convention
-
-- Angle order yaw, pitch, roll; degrees; intrinsic `ZYX`.
-- Mechanical home `(0, 0, 0)`; workspace yaw ±60°, pitch ±10°, roll ±10°
-  (simultaneous pitch −10° and roll −10° is mechanically unreachable).
-- Estimates are reported in the mechanical dial frame.
-
-## Files
-
-Pipeline scripts, in workflow order:
-
-- `measure_sensor_offsets.py` — magnet-out static offsets at home
-- `test_sensor_stability.py` — coherent-reader noise gate at two poses
-- `measure_imu_yaw_reference.py` — home-pose `yaw0` for IMU display/labels
-- `test_magnet_mount.py` — magnet reinstallation repeatability gate
-- `record_calibration_data.py` — synchronized IMU + magnetic pose recorder
-- `freeze_datasets.py` — locks dataset hashes/roles into `dataset_manifest.json`
-- `fit_physical_model.py` — fits the model from the locked calibration data
-- `compensate_calibration_yaw.py` — removes IMU heading wander from calibration
-  yaw labels (iterate with refitting until converged)
-- `align_calibration_yaw_to_dial.py` — converts the converged compensated yaw
-  labels to the mechanical dial frame while preserving the source values
-- `fit_yaw_zero_correction.py` — measures the model-frame→dial-frame offset
-  from poses at known dial angles; now used as a zero-offset diagnostic
-- `compensate_verification_yaw.py` — same wander removal for verification data
-- `evaluate_physical_model.py` — evaluator; locked-holdout mode by default,
-  `--data`/`--yaw-column` for other labeled sets
-- `verify_model.py` — one command: compensate + evaluate the verification data
-- `live_estimation.py` — live 3D pose from the magnetic sensors only
-- `live_estimation_vs_imu.py` — live magnetic estimate next to the Xsens
-  reference
-
-Support: `physical_model.py` (forward model), `physical_estimator.py`
-(inversion: coarse grid + bounded refinement + tracking),
-`physical_model_fit_config.json` (bounds/priors/gate),
-`geometry_priors.json`, `tools/` (TLV493D coherent reader, Xsens reader).
-
-Data and evidence: `calibration_data.csv` (raw, original IMU labels),
-`calibration_data_heading_compensated_iter3.csv` (wander-corrected intermediate),
-`calibration_data_dial_aligned.csv` (current fitting labels; manifest entry),
-`verification_data.csv` (+ `_yaw_compensated`), `yaw_bias_diagnostic.csv` (dial
-poses), sensor/mount/IMU raw sample files, and the fit/verification reports
-named `physical_model_*`.
-
-## Workflows
-
-Hardware preparation (each writes raw samples + a JSON report, refuses to
-overwrite without `--force`):
-
-```bash
-env/bin/python measure_sensor_offsets.py    # magnet removed, rig at home
-env/bin/python test_sensor_stability.py     # magnet installed
-env/bin/python measure_imu_yaw_reference.py # rig still at home
-env/bin/python test_magnet_mount.py         # 5 reinstallation trials
-```
-
-Record poses (ENTER records one averaged pose, `q` quits; appends to
-`calibration_data.csv`):
-
-```bash
-env/bin/python record_calibration_data.py
-```
-
-Fit and calibrate the frame:
-
-```bash
-env/bin/python freeze_datasets.py           # lock dataset hashes
-env/bin/python fit_physical_model.py        # fit from locked calibration only
-env/bin/python compensate_calibration_yaw.py  # then refit; repeat until stable
-env/bin/python align_calibration_yaw_to_dial.py --force
-env/bin/python freeze_datasets.py --calibration calibration_data_dial_aligned.csv --force
-env/bin/python fit_physical_model.py --force
-env/bin/python fit_yaw_zero_correction.py --force  # diagnostic should be near zero
-```
-
-Report performance on the verification data (compensation + evaluation):
-
-```bash
-env/bin/python verify_model.py
-```
-
-(`evaluate_physical_model.py` without `--data` is reserved for consuming a
-future locked untouched holdout.)
-
-Run live (magnetic-only, dial-frame output):
+Magnetic estimate only:
 
 ```bash
 env/bin/python live_estimation.py
 ```
 
-The status line shows the six-channel model RMS (~0.03 mT is healthy; a jump
-means a wrong tracking minimum or a physical change — retry with
-`--cold-start`). `live_estimation_vs_imu.py` additionally shows the Xsens
-panel. It averages fresh Xsens samples while the rig is stationary at startup
-and defines that home yaw as 0°. The Xsens heading can still wander afterward,
-so treat yaw "error" there as an IMU-drift display, not model error. Pass
-`--use-fixed-imu-yaw0` only to reproduce the old file-based yaw reference.
+Magnetic estimate beside the Xsens reference:
 
-All magnetic acquisition uses the shared coherent reader
-(`tools/tlv493d_coherent.py`): a TLV493D frame is accepted only with `CHANNEL`
-status 0, and one pre-trigger frame is discarded after every pose change.
+```bash
+env/bin/python live_estimation_vs_imu.py
+```
 
-See `transfer_to_real_plan.md` for the full process and next steps.
+Keep the rig at mechanical home during the one-second Xsens startup zeroing.
+The Xsens comparison is intended for short sessions because its yaw can drift
+near the magnet.
+
+Reproduce the saved verification result:
+
+```bash
+env/bin/python verify_model.py
+```
+
+## Final performance
+
+| Measurement | Result |
+|---|---:|
+| Calibration field RMSE | 0.122 mT |
+| Verification yaw MAE | 0.320° |
+| Verification pitch MAE | 0.342° |
+| Verification roll MAE | 0.602° |
+| Mechanical dial yaw MAE | 0.468° |
+| Runtime yaw offset | 0° |
+
+Verification yaw removes smooth Xsens heading drift against the magnetic model,
+so it measures repeatability rather than an independent absolute-yaw holdout.
+The six mechanical dial poses provide the absolute-yaw check.
+
+## Layout
+
+```text
+config/
+  model.json             fitted model, geometry, pose convention, workspace
+  sensor_offsets.json    six magnet-out sensor offsets
+data/
+  calibration.csv        original calibration recording
+  verification.csv       original verification recording
+magnetic_pose/            shared model, estimator, hardware, IMU, and plotting code
+results/
+  calibration_report.json
+  dial_frame_check.json
+  verification_report.json
+tools/
+  calibrate_sensor_offsets.py
+  read_sensors.py
+live_estimation.py
+live_estimation_vs_imu.py
+verify_model.py
+```
+
+All fitted geometry and operating bounds are together in `config/model.json`.
+The pose convention is intrinsic `ZYX` in degrees, ordered yaw, pitch, roll.
+The workspace is yaw ±60°, pitch ±10°, and roll ±10°.
+
+## Maintenance tools
+
+Read both magnetic sensors:
+
+```bash
+env/bin/python tools/read_sensors.py
+```
+
+Recalibrate offsets after removing the main magnet:
+
+```bash
+env/bin/python tools/calibrate_sensor_offsets.py --force
+```
+
+The Raspberry Pi warning that the I²C frequency is not settable from Python is
+expected and does not stop acquisition.

@@ -19,15 +19,12 @@ MTData2). Reference: MT_Low-Level_Documentation.pdf
   - Format nibble: precision 0=Float32 1=Fp1220 2=Fp1632 3=Float64
                    coord     0=ENU 4=NED 8=NWU   (floats are big-endian)
 
-This is a low-level hardware reader. The clean pipeline defines session yaw at
-the mechanical home pose: average the initial IMU yaw as yaw0, then use wrapped
-(yaw - yaw0) for the complete session. Roll and pitch are used directly after
-the rig's fixed mount/axis conversion below. Validate this convention before
-recording new calibration data.
+The live comparison defines session yaw at mechanical home. Roll and pitch use
+the fixed mount/axis conversion below.
 
 Usage:
-    python3 xsens_mti630_reader.py [--port /dev/ttyUSB0] [--baud 921600]
-                                   [--seconds 0] [--csv out.csv]
+    python3 -m magnetic_pose.xsens [--port /dev/ttyUSB0] [--baud 921600]
+                                  [--seconds 0] [--csv out.csv]
     --seconds 0  runs until Ctrl-C.
 """
 import argparse

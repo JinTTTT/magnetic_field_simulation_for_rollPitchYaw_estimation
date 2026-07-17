@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reusable finite-cylinder forward model for the clean calibration pipeline."""
+"""Finite-cylinder magnetic field model."""
 
 import json
 import os
@@ -13,6 +13,7 @@ from scipy.spatial.transform import Rotation
 
 
 CHANNELS = ("S1_Bx", "S1_By", "S1_Bz", "S2_Bx", "S2_By", "S2_Bz")
+DEFAULT_MODEL_PATH = Path(__file__).resolve().parents[1] / "config" / "model.json"
 
 
 def sensor_home_positions_mm(sensor_plane_z_mm, ring_radius_mm,
@@ -71,7 +72,7 @@ def predict_mT(angles_deg, model):
     return np.hstack(output)
 
 
-def load_model(path=Path("physical_model.json")):
+def load_model(path=DEFAULT_MODEL_PATH):
     with Path(path).open() as source:
         payload = json.load(source)
     if payload.get("schema_version") != 1:

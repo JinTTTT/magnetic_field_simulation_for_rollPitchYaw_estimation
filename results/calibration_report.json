@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "model": "config/model.json",
+  "source_data": "data/calibration.csv",
+  "poses": 332,
+  "field_rmse_mT": 0.12206756002005273,
+  "median_sensor_noise_mT": 0.108457,
+  "optimizer_converged": true,
+  "parameters_at_bounds": 0,
+  "calibration_gate_passed": true,
+  "yaw_frame": "mechanical_dial",
+  "note": "The final fit used heading-compensated, dial-aligned labels derived from the preserved source data."
+}
