@@ -122,8 +122,10 @@ env/bin/python live_estimation.py
 The status line shows the six-channel model RMS (~0.03 mT is healthy; a jump
 means a wrong tracking minimum or a physical change — retry with
 `--cold-start`). `live_estimation_vs_imu.py` additionally shows the Xsens
-panel; its yaw comparison mixes frames (IMU heading wanders), so treat yaw
-"error" there as an IMU-drift display, not model error.
+panel. It averages fresh Xsens samples while the rig is stationary at startup
+and defines that home yaw as 0°. The Xsens heading can still wander afterward,
+so treat yaw "error" there as an IMU-drift display, not model error. Pass
+`--use-fixed-imu-yaw0` only to reproduce the old file-based yaw reference.
 
 All magnetic acquisition uses the shared coherent reader
 (`tools/tlv493d_coherent.py`): a TLV493D frame is accepted only with `CHANNEL`

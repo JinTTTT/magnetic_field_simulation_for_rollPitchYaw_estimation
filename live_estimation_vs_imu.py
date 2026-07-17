@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare live physical-model magnetic estimation with the fixed-reference IMU."""
+"""Compare live magnetic estimation with an IMU whose yaw is zeroed at startup."""
 
 import argparse
 import hashlib
@@ -11,7 +11,7 @@ import time
 import numpy as np
 from scipy.spatial.transform import Rotation
 
-from measure_imu_yaw_reference import wrap180
+from measure_imu_yaw_reference import circular_mean_deg, wrap180, yaw_stddev_deg
 from physical_estimator import PhysicalModelEstimator
 from record_calibration_data import LiveIMU
 from tools.tlv493d_coherent import (
@@ -52,14 +52,18 @@ class LivePoseSource:
             manifest = json.load(source)
         load_locked_json(args.geometry, manifest, "geometry_priors")
         offsets_data = load_locked_json(args.offsets, manifest, "sensor_offsets")
-        yaw_data = load_locked_json(args.yaw_reference, manifest, "imu_yaw_reference")
         if offsets_data.get("sensor_reader", {}).get("type") != READER_TYPE:
             raise ValueError("sensor offsets do not use the coherent TLV reader")
         self.offsets_mT = np.asarray(
             offsets_data["offsets_mT"]["S1"] + offsets_data["offsets_mT"]["S2"],
             dtype=float,
         )
-        self.yaw0_deg = float(yaw_data["yaw0_deg"])
+        self.yaw0_deg = None
+        if args.use_fixed_imu_yaw0:
+            yaw_data = load_locked_json(
+                args.yaw_reference, manifest, "imu_yaw_reference"
+            )
+            self.yaw0_deg = float(yaw_data["yaw0_deg"])
         self.estimator = PhysicalModelEstimator(
             model_path=args.model, geometry_path=args.geometry,
             correction_path=args.correction,
@@ -84,10 +88,43 @@ class LivePoseSource:
         self.error = None
 
     def start(self):
-        self.imu.start()
-        self.imu.wait_for_sample()
-        print(f"using fixed IMU yaw0 {self.yaw0_deg:+.6f} deg")
-        print(f"yaw zero correction: {self.estimator.yaw_zero_offset_deg:+.3f} deg "
+        try:
+            self.imu.start()
+            self.imu.wait_for_sample()
+            if self.yaw0_deg is None:
+                print(
+                    "zeroing Xsens yaw at mechanical home; "
+                    f"keep the rig stationary for {self.args.imu_zero_seconds:g} s"
+                )
+                started = time.monotonic()
+                time.sleep(self.args.imu_zero_seconds)
+                samples = self.imu.samples_between(started, time.monotonic())
+                yaws = [sample[0] for sample in samples]
+                if len(yaws) < 2:
+                    raise RuntimeError(
+                        "fewer than two fresh IMU samples were received during "
+                        "startup yaw calibration"
+                    )
+                self.yaw0_deg = circular_mean_deg(yaws)
+                yaw_stddev = yaw_stddev_deg(yaws, self.yaw0_deg)
+                if yaw_stddev > self.args.imu_zero_max_stddev_deg:
+                    raise RuntimeError(
+                        "IMU moved during startup yaw calibration: "
+                        f"stddev {yaw_stddev:.3f} deg exceeds "
+                        f"{self.args.imu_zero_max_stddev_deg:.3f} deg"
+                    )
+                print(
+                    f"startup IMU yaw zero: {self.yaw0_deg:+.6f} deg "
+                    f"from {len(yaws)} samples (stddev {yaw_stddev:.4f} deg)"
+                )
+            else:
+                print(f"using fixed IMU yaw0 {self.yaw0_deg:+.6f} deg")
+        except Exception:
+            self.imu.stop()
+            self.serial_port.close()
+            raise
+        print(f"magnetic model-to-dial yaw offset: "
+              f"{self.estimator.yaw_zero_offset_deg:+.3f} deg "
               "(model frame -> dial frame)")
         print(f"coarse estimator grid: {len(self.estimator.grid_poses)} poses")
         self.thread.start()
@@ -248,6 +285,18 @@ def parse_args():
     parser.add_argument("--offsets", type=Path, default=Path("sensor_offsets.json"))
     parser.add_argument("--yaw-reference", type=Path,
                         default=Path("imu_yaw_reference.json"))
+    parser.add_argument(
+        "--use-fixed-imu-yaw0", action="store_true",
+        help="use --yaw-reference instead of zeroing Xsens yaw at startup",
+    )
+    parser.add_argument(
+        "--imu-zero-seconds", type=float, default=1.0,
+        help="stationary startup interval used to zero Xsens yaw (default: 1.0)",
+    )
+    parser.add_argument(
+        "--imu-zero-max-stddev-deg", type=float, default=0.25,
+        help="reject startup yaw zeroing above this sample stddev (default: 0.25)",
+    )
     parser.add_argument("--samples", type=int, default=8)
     parser.add_argument("--sample-delay", type=float, default=0.03)
     parser.add_argument("--refresh-ms", type=int, default=100)
@@ -264,6 +313,10 @@ def parse_args():
         parser.error("--samples and --global-starts must be at least 1")
     if min(args.sample_delay, args.reacquire_threshold_mT) < 0:
         parser.error("delays and thresholds cannot be negative")
+    if args.imu_zero_seconds <= 0:
+        parser.error("--imu-zero-seconds must be positive")
+    if args.imu_zero_max_stddev_deg < 0:
+        parser.error("--imu-zero-max-stddev-deg cannot be negative")
     if args.refresh_ms < 10:
         parser.error("--refresh-ms must be at least 10")
     return args
