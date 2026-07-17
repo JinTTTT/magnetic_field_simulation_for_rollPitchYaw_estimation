@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-07-17T09:44:21.443080+00:00",
+  "calibration_type": "imu_yaw_reference_at_mechanical_home",
+  "mechanical_pose_deg": {
+    "yaw": 0.0,
+    "pitch": 0.0,
+    "roll": 0.0
+  },
+  "angle_unit": "degree",
+  "yaw_rule": "yaw = wrap180(yaw_raw - yaw0)",
+  "pitch_rule": "use raw IMU pitch directly",
+  "roll_rule": "use raw IMU roll directly",
+  "yaw0_deg": 0.857797679798953,
+  "stationary_statistics": {
+    "yaw_sample_stddev_deg": 0.0019382568816847623,
+    "pitch_home_mean_deg": -1.5550892977511273,
+    "pitch_sample_stddev_deg": 0.003797335137798486,
+    "roll_home_mean_deg": -0.46736340818717503,
+    "roll_sample_stddev_deg": 0.0020874682258534066
+  },
+  "acquisition": {
+    "port": "/dev/ttyUSB0",
+    "baud": 921600,
+    "samples": 200,
+    "buffer_drain_seconds": 0.3,
+    "raw_samples_file": "imu_home_samples.csv"
+  }
+}

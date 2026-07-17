@@ -9,9 +9,9 @@ code, fitted models, lookup table, and recorded datasets remain available on the
 
 ## Current status
 
-The clean workflow is defined, and the directly measured rig geometry has been
-separated from old fitted parameters. No new sensor calibration, model fit, or
-lookup table exists yet on this branch.
+The clean workflow and geometry priors are defined. New static sensor offsets
+and the home IMU yaw reference have been recorded. No new magnet-in calibration
+dataset, fitted model, or lookup table exists yet on this branch.
 
 The carried-over geometry in `geometry_priors.json` has been checked by the
 user. The next task is the magnet-out sensor calibration.
@@ -23,6 +23,10 @@ user. The next task is the magnet-out sensor calibration.
   priors; it contains no fitted parameters
 - `measure_sensor_offsets.py` — records the six static magnet-out offsets at
   mechanical home and preserves the raw samples
+- `measure_imu_yaw_reference.py` — records stationary home-pose IMU samples and
+  saves their circular mean yaw as `yaw0`
+- `test_magnet_mount.py` — measures corrected home fields across repeated magnet
+  installations and reports their per-channel spread
 - `tools/read_tlv493d.py` — basic two-sensor hardware check
 - `tools/xsens_mti630_reader.py` — low-level Xsens orientation reader
 
@@ -55,3 +59,29 @@ The default acquisition takes three batches of 128 samples. It writes every
 sample to `sensor_offset_samples.csv` and writes the six means and stability
 statistics to `sensor_offsets.json`. Existing outputs are not overwritten
 unless `--force` is supplied.
+
+## Measure the IMU yaw reference
+
+Keep the rig stationary at mechanical home and run:
+
+```bash
+env/bin/python measure_imu_yaw_reference.py
+```
+
+The script records 200 fresh Xsens samples by default. It writes the raw
+orientations to `imu_home_samples.csv` and the fixed home yaw reference to
+`imu_yaw_reference.json`. Pitch and roll are reported but are not calibrated.
+
+## Test the magnet mount
+
+Run the test with the magnet initially removed:
+
+```bash
+env/bin/python test_magnet_mount.py
+```
+
+For each of five trials, install the magnet, place the rig at mechanical home,
+and press ENTER. Remove the magnet again before the next trial. The script loads
+`sensor_offsets.json`, preserves all readings in `magnet_mount_samples.csv`, and
+writes the corrected-field repeatability report to `magnet_mount_test.json`.
+The default acceptance limit is 0.1 mT on every channel.
