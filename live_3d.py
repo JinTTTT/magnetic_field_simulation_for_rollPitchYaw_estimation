@@ -61,7 +61,8 @@ class LivePoseSource:
         )
         self.yaw0_deg = float(yaw_data["yaw0_deg"])
         self.estimator = PhysicalModelEstimator(
-            model_path=args.model, geometry_path=args.geometry
+            model_path=args.model, geometry_path=args.geometry,
+            correction_path=args.correction,
         )
         identifiers = self.estimator.model.get("input_identifiers", {})
         if identifiers.get("calibration_sha256") != manifest["files"]["calibration"]["sha256"]:
@@ -240,6 +241,8 @@ def run(args):
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", type=Path, default=Path("physical_model.json"))
+    parser.add_argument("--correction", type=Path,
+                        default=Path("yaw_zero_correction.json"))
     parser.add_argument("--geometry", type=Path, default=Path("geometry_priors.json"))
     parser.add_argument("--manifest", type=Path, default=Path("dataset_manifest.json"))
     parser.add_argument("--offsets", type=Path, default=Path("sensor_offsets.json"))

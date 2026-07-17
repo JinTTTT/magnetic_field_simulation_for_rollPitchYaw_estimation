@@ -46,6 +46,9 @@ def hat_basis(times_s, knots_s):
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data", type=Path, default=Path("verification_data.csv"))
+    parser.add_argument("--model", type=Path, default=Path("physical_model.json"))
+    parser.add_argument("--correction", type=Path,
+                        default=Path("yaw_zero_correction.json"))
     parser.add_argument("--output", type=Path,
                         default=Path("verification_data_yaw_compensated.csv"))
     parser.add_argument("--knot-spacing-s", type=float, default=90.0)
@@ -83,7 +86,9 @@ def main():
         int(np.argmin(np.abs(STATIONS_DEG - yaw))) for yaw in labels[:, 0]
     ])
 
-    estimator = PhysicalModelEstimator()
+    estimator = PhysicalModelEstimator(
+        model_path=args.model, correction_path=args.correction
+    )
     estimator.lower[0] -= args.yaw_margin_deg
     estimator.upper[0] += args.yaw_margin_deg
     yaw_values = inclusive_range(estimator.lower[0], estimator.upper[0], 10.0)

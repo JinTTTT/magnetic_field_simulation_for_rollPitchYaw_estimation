@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
-  "created_at_utc": "2026-07-17T16:48:07.307297+00:00",
+  "created_at_utc": "2026-07-17T15:48:10.560551+00:00",
   "correction_type": "constant_model_frame_to_dial_frame_yaw_offset",
   "yaw_rule": "dial_yaw = model_yaw - yaw_zero_offset_deg",
   "assumption": "The model's calibration labels are rotated from the mechanical dial frame by one constant yaw offset; the dial angles below are treated as truth.",
   "inputs": {
     "data_path": "yaw_bias_diagnostic.csv",
     "data_sha256": "6243b33206290f1b27d4985ace3805d0bb16250d4c7338ea2c80dcc02b5db027",
-    "model_path": "physical_model_v4.json",
-    "model_sha256": "d5ae9c985962c6a2ca67b76e9dfc4db1ef3af8a319463bfafdfc926f30f3cf0a",
+    "model_path": "physical_model.json",
+    "model_sha256": "6429a28202ce729ef20325f3dfde9017af54921fd2a7f52e9f3236ce242b0afb",
     "dial_yaws_deg": [
       0.0,
       -60.0,
@@ -19,21 +19,21 @@
     ]
   },
   "per_pose_offset_deg": [
-    4.855114428577453,
-    5.223218054194441,
-    5.231083624162244,
-    4.8466858989240835,
-    5.350153891170092,
-    6.785072408551483
+    4.818062114135903,
+    5.641424998137421,
+    5.5467312193978735,
+    4.864445134595396,
+    4.907969222370871,
+    6.504587126815543
   ],
   "per_pose_field_rms_mT": [
-    0.007777141891976959,
-    0.028139696635189327,
-    0.023334090605440828,
-    0.015757637191267344,
-    0.01820747723746008,
-    0.01885953991831026
+    0.012594007850966517,
+    0.01336980135088242,
+    0.020127130822725114,
+    0.011451004280999317,
+    0.031934092635245895,
+    0.042069006984300265
   ],
-  "yaw_zero_offset_deg": 5.381888050929966,
-  "offset_stddev_deg": 0.7185796175907416
+  "yaw_zero_offset_deg": 5.380536635908835,
+  "offset_stddev_deg": 0.6580609195119598
 }
