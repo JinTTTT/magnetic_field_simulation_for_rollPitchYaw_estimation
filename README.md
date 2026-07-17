@@ -58,6 +58,9 @@ requires a newly recorded untouched holdout set.
   evaluator
 - `physical_model_verification_report.json` — saved 60-pose baseline accuracy
 - `live_3d.py` — live side-by-side magnetic estimate and Xsens reference
+- `tools/rolling_field_average.py` — thread-safe timestamped rolling magnetic
+  average used by live estimation
+- `test_rolling_field_average.py` — hardware-independent rolling-window tests
 - `tools/tlv493d_coherent.py` — shared frame-validated TLV493D-A1B6 reader
 - `test_sensor_stability.py` — compares coherent magnetic noise at home and
   approximately +90° yaw before accepting new calibration measurements
@@ -190,6 +193,10 @@ pitch, and roll errors plus the six-channel model RMS. The program loads the
 locked sensor offsets and the saved `yaw0`; it does not silently recapture or
 change either reference. Close the window or press Ctrl-C to stop.
 
-The default averages eight magnetic frames per update. For a faster but noisier
-display, use `--samples 4`. If tracking ever appears stuck after moving the rig
-abruptly, run once with `--cold-start` to force a global search on every frame.
+The `--samples` option is the rolling magnetic-window size. After the initial
+window fills, each new coherent frame replaces the oldest frame and produces a
+new estimator input; the program does not wait for a completely new batch. The
+default window is eight frames. Use `--samples 32` for the smoother yaw behavior
+measured during stability testing, at the cost of blending roughly one second
+of recent motion. If tracking ever appears stuck after moving the rig abruptly,
+run once with `--cold-start` to force a global search on every frame.

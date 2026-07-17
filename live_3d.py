@@ -13,6 +13,7 @@ from scipy.spatial.transform import Rotation
 
 from physical_estimator import PhysicalModelEstimator
 from record_calibration_data import LiveIMU, summarize_imu
+from tools.rolling_field_average import RollingFieldAverage
 from tools.tlv493d_coherent import (
     READER_TYPE,
     open_sensor_pair,
@@ -74,7 +75,11 @@ class LivePoseSource:
         self.imu = LiveIMU(self.serial_port, xsens)
         self.stop_event = threading.Event()
         self.lock = threading.Lock()
-        self.thread = threading.Thread(target=self._run, daemon=True)
+        self.field_average = RollingFieldAverage(args.samples)
+        self.sensor_thread = threading.Thread(
+            target=self._read_fields, daemon=True
+        )
+        self.estimator_thread = threading.Thread(target=self._run, daemon=True)
         self.estimate = np.zeros(3)
         self.truth = np.zeros(3)
         self.model_rms_mT = np.nan
@@ -84,13 +89,21 @@ class LivePoseSource:
     def start(self):
         self.imu.start()
         self.imu.wait_for_sample()
+        prime_sensor_pair(self.sensors)
         print(f"using fixed IMU yaw0 {self.yaw0_deg:+.6f} deg")
         print(f"coarse estimator grid: {len(self.estimator.grid_poses)} poses")
-        self.thread.start()
+        print(
+            f"rolling magnetic average: {self.args.samples} samples, "
+            "updated with every new frame"
+        )
+        self.sensor_thread.start()
+        self.estimator_thread.start()
 
     def stop(self):
         self.stop_event.set()
-        self.thread.join(timeout=2.0)
+        self.field_average.close()
+        self.sensor_thread.join(timeout=2.0)
+        self.estimator_thread.join(timeout=2.0)
         self.imu.stop()
         self.serial_port.close()
 
@@ -101,29 +114,49 @@ class LivePoseSource:
                 self.reacquired, self.error,
             )
 
-    def _acquire_fields(self):
-        prime_sensor_pair(self.sensors)
-        start = time.monotonic()
-        samples = []
-        for _ in range(self.args.samples):
-            samples.append(read_pair_mT(self.sensors))
-            if self.args.sample_delay:
-                time.sleep(self.args.sample_delay)
-        end = time.monotonic()
-        return np.mean(samples, axis=0), start, end
+    def _set_error(self, error):
+        with self.lock:
+            if self.error is None:
+                self.error = error
+
+    def _read_fields(self):
+        try:
+            while not self.stop_event.is_set():
+                start = time.monotonic()
+                fields_mT = read_pair_mT(self.sensors)
+                if self.args.sample_delay:
+                    if self.stop_event.wait(self.args.sample_delay):
+                        break
+                end = time.monotonic()
+                self.field_average.append(fields_mT, start, end)
+        except Exception as error:
+            if not self.stop_event.is_set():
+                self._set_error(error)
+                self.stop_event.set()
+                self.field_average.close()
 
     def _run(self):
         previous = None
+        version = 0
         try:
             while not self.stop_event.is_set():
-                raw_mT, start, end = self._acquire_fields()
-                imu_samples = self.imu.samples_between(start, end)
+                window = self.field_average.wait_for_snapshot(
+                    after_version=version, timeout=0.5
+                )
+                if window is None:
+                    continue
+                version = window.version
+                if not window.ready:
+                    continue
+                imu_samples = self.imu.samples_between(
+                    window.start_time, window.end_time
+                )
                 truth_summary = summarize_imu(imu_samples, self.yaw0_deg)
                 truth = np.asarray((
                     truth_summary["yaw"], truth_summary["pitch"],
                     truth_summary["roll"],
                 ))
-                corrected_mT = raw_mT - self.offsets_mT
+                corrected_mT = window.mean_mT - self.offsets_mT
                 result = self.estimator.estimate(
                     corrected_mT,
                     seed=None if self.args.cold_start else previous,
@@ -137,8 +170,10 @@ class LivePoseSource:
                     self.model_rms_mT = result["model_rms_mT"]
                     self.reacquired = result["reacquired"]
         except Exception as error:
-            with self.lock:
-                self.error = error
+            if not self.stop_event.is_set():
+                self._set_error(error)
+                self.stop_event.set()
+                self.field_average.close()
 
 
 def configure_panel(axis, title):
@@ -244,7 +279,10 @@ def parse_args():
     parser.add_argument("--offsets", type=Path, default=Path("sensor_offsets.json"))
     parser.add_argument("--yaw-reference", type=Path,
                         default=Path("imu_yaw_reference.json"))
-    parser.add_argument("--samples", type=int, default=8)
+    parser.add_argument(
+        "--samples", type=int, default=8,
+        help="rolling magnetic window size (default: 8)",
+    )
     parser.add_argument("--sample-delay", type=float, default=0.03)
     parser.add_argument("--refresh-ms", type=int, default=100)
     parser.add_argument("--global-starts", type=int, default=3)
