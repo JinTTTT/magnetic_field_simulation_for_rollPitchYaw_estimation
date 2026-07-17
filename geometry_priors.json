@@ -24,10 +24,10 @@
     "field_unit": "mT"
   },
   "workspace_deg": {
-    "yaw": [-120.0, 120.0],
+    "yaw": [-60.0, 60.0],
     "pitch": [-10.0, 10.0],
     "roll": [-10.0, 10.0],
-    "source": "demonstrated operating workspace from the proof-of-concept rig"
+    "source": "user-selected operating workspace for the clean calibration pipeline, updated 2026-07-17"
   },
   "pivot": {
     "position_mm": [0.0, 0.0, 0.0],

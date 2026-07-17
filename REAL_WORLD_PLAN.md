@@ -16,6 +16,8 @@ inputs to the new fit.
 - The pose convention is intrinsic `ZYX`.
 - Magnetic fields are recorded in mT. The model may convert them to T internally.
 - The mechanical home pose is `(yaw, pitch, roll) = (0, 0, 0)`.
+- The operating workspace is yaw `[-60, +60]`, pitch `[-10, +10]`, and roll
+  `[-10, +10]` degrees.
 - The Xsens IMU continues to provide roll, pitch, and yaw.
 - Roll and pitch are used directly from the IMU.
 - Only yaw is referenced at startup: hold the rig at mechanical home, average

@@ -51,6 +51,8 @@ fresh conversion before averaging begins.
 - Units: degrees
 - Rotation sequence: intrinsic `ZYX`
 - Mechanical home pose: `(0, 0, 0)`
+- Operating workspace: yaw `[-60, +60]`, pitch `[-10, +10]`, and roll
+  `[-10, +10]` degrees
 - IMU pitch and roll are used directly
 - At the beginning of each session, the IMU yaw at mechanical home is averaged
   as `yaw0`; session yaw is `wrap180(yaw_raw - yaw0)`
