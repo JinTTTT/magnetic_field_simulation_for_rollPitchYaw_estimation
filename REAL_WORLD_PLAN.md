@@ -23,10 +23,10 @@ inputs to the new fit.
   use only the measured reachable domain.
 - The Xsens IMU continues to provide roll, pitch, and yaw.
 - Roll and pitch are used directly from the IMU.
-- Only yaw is referenced at startup: hold the rig at mechanical home, average
-  the IMU yaw as `yaw0`, then use `wrap180(yaw_raw - yaw0)` for the whole session.
-- `yaw0` is captured once at the beginning of a recording or live session and
-  is never changed in the middle of that session.
+- Only yaw is calibrated: hold the rig at mechanical home, average the IMU yaw
+  as `yaw0`, and save the accepted result in `imu_yaw_reference.json`.
+- Recording and live comparison use `wrap180(yaw_raw - yaw0)` with that same
+  saved reference. It is not silently recaptured between datasets or live runs.
 - Calibration and verification data never share fitted parameters or residual
   correction training.
 - Raw measurements are preserved. Corrections are applied during processing,
@@ -89,10 +89,10 @@ Place the rig at the mechanical `(0, 0, 0)` home pose and keep it still.
 2. Use `wrap180(yaw_raw - yaw0)` as yaw.
 3. Use the IMU pitch and roll values directly.
 4. Store `yaw0` and a session ID with every dataset.
-5. Do not re-zero yaw during that session.
+5. Do not re-zero yaw during recording or live estimation.
 
-Repeat the startup procedure for each new recording or live session because the
-physical home pose is the reference, not a permanent raw IMU heading value.
+If the IMU mounting or its heading reference changes, repeat this step and then
+repeat all downstream data collection and fitting that depends on it.
 
 **Gate:** repeated starts at mechanical home report yaw close to zero and have
 acceptable short-term drift.
@@ -110,7 +110,7 @@ reinstall it several times and compare all six sensor channels.
 
 With the magnet installed:
 
-1. Start at mechanical home and capture `yaw0` once.
+1. Load the accepted home-pose `yaw0`.
 2. Cover the full yaw, pitch, and roll workspace, including edges and combined
    rotations.
 3. At each pose, record synchronized IMU angles and magnetic samples.
@@ -124,7 +124,7 @@ Only this new dataset is used to fit the physical model.
 ### 7. Record untouched verification data
 
 Record verification data in a separate acquisition session using the same
-startup yaw procedure, units, and pose convention. Cover the full workspace and
+saved yaw reference, units, and pose convention. Cover the full workspace and
 include combined rotations.
 
 Do not use these measurements for fitting, choosing priors, selecting residual
@@ -153,6 +153,13 @@ penalties. The calibration data determines the final fitted values.
 **Gate:** fitted values remain physically plausible and the field residual is
 close to the measured noise level.
 
+The clean implementation freezes all input hashes in `dataset_manifest.json`,
+uses explicit bounds and prior uncertainties from
+`physical_model_fit_config.json`, and forbids the fitter from loading the
+verification dataset. The accepted model is stored in `physical_model.json`;
+its calibration-only evidence is stored separately in
+`physical_model_calibration_report.json`.
+
 ### 9. Fit the residual correction
 
 After the physical model is fixed, fit a smooth pose-dependent correction to its
@@ -176,6 +183,11 @@ Lock the model and correction before opening the verification result. Report:
 If the model is changed after examining verification results, that verification
 set becomes development data and a new untouched set must be recorded.
 
+The first 60-pose verification set was consumed to quantify the physical-only
+baseline before residual correction. Its MAE was `2.037 deg` yaw,
+`0.315 deg` pitch, and `0.602 deg` roll. It must not be presented later as the
+untouched final evaluation of a residual-corrected model.
+
 **Output:** the final verification report and an accepted or rejected model.
 
 ### 11. Build a versioned lookup table
@@ -190,8 +202,8 @@ rejected automatically.
 
 At startup:
 
-1. Place the rig at mechanical home.
-2. Capture `yaw0` once for the IMU comparison.
+1. Load the accepted fixed `yaw0` for the IMU comparison.
+2. Verify that the saved sensor offsets, geometry, and model identifiers match.
 3. Load the accepted sensor calibration, physical model, residual correction,
    and matching lookup table.
 4. Apply the same units, channel order, angle order, and rotation convention

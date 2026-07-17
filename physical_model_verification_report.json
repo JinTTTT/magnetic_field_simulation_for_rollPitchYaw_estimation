@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-07-17T13:29:00.279329+00:00",
+  "report_type": "physical_model_only_verification",
+  "residual_correction_active": false,
+  "verification_status_after_report": "consumed_development_evidence; a new untouched set is required after residual correction",
+  "inputs": {
+    "verification_path": "verification_data.csv",
+    "verification_sha256": "24578ebed9e77f8510c314034070f89803ca0c2a47a63fad306d8c2e303d7bcc",
+    "verification_rows": 60,
+    "model_path": "physical_model.json",
+    "model_sha256": "6429a28202ce729ef20325f3dfde9017af54921fd2a7f52e9f3236ce242b0afb"
+  },
+  "method": {
+    "truth_used_as_estimator_seed": false,
+    "recording_order_used_for_tracking": false,
+    "coarse_grid_points": 325,
+    "global_starts_per_pose": 1,
+    "local_optimizer": "bounded scipy.optimize.least_squares",
+    "median_function_evaluations": 7.0
+  },
+  "angle_error_deg": {
+    "yaw": {
+      "mae": 2.0374182937051706,
+      "rmse": 2.293373378282881,
+      "median_absolute": 2.151032498005165,
+      "p95_absolute": 3.606231076082083,
+      "maximum_absolute": 4.089031020952689
+    },
+    "pitch": {
+      "mae": 0.3149775585526346,
+      "rmse": 0.44327705230390174,
+      "median_absolute": 0.22384262982350395,
+      "p95_absolute": 0.9039482282498869,
+      "maximum_absolute": 1.4801617478272924
+    },
+    "roll": {
+      "mae": 0.6024097824700007,
+      "rmse": 0.7518935071942091,
+      "median_absolute": 0.5007255182726438,
+      "p95_absolute": 1.4513118523986124,
+      "maximum_absolute": 1.8693429865611888
+    }
+  },
+  "worst_axis_error_deg": {
+    "mae": 2.0736407085631647,
+    "rmse": 2.3008704402134827,
+    "median_absolute": 2.151032498005165,
+    "p95_absolute": 3.606231076082083,
+    "maximum_absolute": 4.089031020952689
+  },
+  "euclidean_angle_error_deg": {
+    "mae": 2.225591958403096,
+    "rmse": 2.453854079499569,
+    "median_absolute": 2.253280604506765,
+    "p95_absolute": 3.855728705117862,
+    "maximum_absolute": 4.318323773335062
+  },
+  "optimized_field_rms_mT": {
+    "mae": 0.028168411195050494,
+    "rmse": 0.030438939039307316,
+    "median_absolute": 0.02766752835780959,
+    "p95_absolute": 0.0462407302484671,
+    "maximum_absolute": 0.060970222573823014
+  }
+}
