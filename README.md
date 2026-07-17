@@ -21,6 +21,8 @@ user. The next task is the magnet-out sensor calibration.
 - `REAL_WORLD_PLAN.md` — the ordered calibration and validation workflow
 - `geometry_priors.json` — measured or nominal physical values used as fitting
   priors; it contains no fitted parameters
+- `measure_sensor_offsets.py` — records the six static magnet-out offsets at
+  mechanical home and preserves the raw samples
 - `tools/read_tlv493d.py` — basic two-sensor hardware check
 - `tools/xsens_mti630_reader.py` — low-level Xsens orientation reader
 
@@ -39,3 +41,17 @@ step passes its gate.
 - `yaw0` is not changed during a session
 
 See `REAL_WORLD_PLAN.md` for the complete process.
+
+## Measure static sensor offsets
+
+Remove the main magnet, keep it far from the rig, and place the mechanism at
+mechanical home. Then run:
+
+```bash
+env/bin/python measure_sensor_offsets.py
+```
+
+The default acquisition takes three batches of 128 samples. It writes every
+sample to `sensor_offset_samples.csv` and writes the six means and stability
+statistics to `sensor_offsets.json`. Existing outputs are not overwritten
+unless `--force` is supplied.

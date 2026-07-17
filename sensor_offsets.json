@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-07-17T09:34:04.940904+00:00",
+  "calibration_type": "static_home_pose_magnet_out_offset",
+  "assumption": "The six magnet-out channel values are static and are subtracted from every later reading.",
+  "conditions": {
+    "main_magnet": "removed_and_kept_far_from_rig",
+    "mechanical_pose_deg": {
+      "yaw": 0.0,
+      "pitch": 0.0,
+      "roll": 0.0
+    }
+  },
+  "channel_order": [
+    "S1_Bx",
+    "S1_By",
+    "S1_Bz",
+    "S2_Bx",
+    "S2_By",
+    "S2_Bz"
+  ],
+  "field_unit": "mT",
+  "acquisition": {
+    "sensor_1_i2c_bus": 3,
+    "sensor_2_i2c_bus": 4,
+    "batches": 3,
+    "samples_per_batch": 128,
+    "total_samples_per_channel": 384,
+    "sample_delay_s": 0.03,
+    "settle_time_s": 2.0,
+    "raw_samples_file": "sensor_offset_samples.csv"
+  },
+  "offsets_mT": {
+    "S1": [
+      -0.06022916666666667,
+      0.07809375,
+      -0.04338541666666667
+    ],
+    "S2": [
+      0.08166666666666667,
+      0.07196875,
+      -0.031901041666666664
+    ]
+  },
+  "sample_stddev_mT": {
+    "S1": [
+      0.11473319980128052,
+      0.11745451455587451,
+      0.1283285494400701
+    ],
+    "S2": [
+      0.09649585460777006,
+      0.10076365886459601,
+      0.0867783744099337
+    ]
+  },
+  "batch_means_mT": [
+    {
+      "S1": [
+        -0.05971875,
+        0.06890625,
+        -0.0336875
+      ],
+      "S2": [
+        0.079625,
+        0.08115625,
+        -0.030625
+      ]
+    },
+    {
+      "S1": [
+        -0.054359375,
+        0.084984375,
+        -0.037515625000000004
+      ],
+      "S2": [
+        0.084984375,
+        0.063546875,
+        -0.032921875
+      ]
+    },
+    {
+      "S1": [
+        -0.066609375,
+        0.08039062500000001,
+        -0.058953125
+      ],
+      "S2": [
+        0.08039062500000001,
+        0.071203125,
+        -0.032156250000000004
+      ]
+    }
+  ],
+  "batch_mean_spread_mT": {
+    "S1": [
+      0.012249999999999997,
+      0.016078125,
+      0.025265625
+    ],
+    "S2": [
+      0.0053593749999999996,
+      0.017609374999999997,
+      0.0022968750000000038
+    ]
+  }
+}

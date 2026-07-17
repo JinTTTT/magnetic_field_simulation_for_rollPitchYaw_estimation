@@ -54,24 +54,25 @@ fitting bound before optimizing that parameter.
 
 **Output:** `geometry_priors.json`.
 
-### 3. Calibrate the magnetic sensors without the main magnet
+### 3. Measure the static magnetic offsets without the main magnet
 
-Remove the main magnet and record both sensors at multiple known orientations.
-Use these measurements to estimate:
+Assume the magnet-out error is static and consistent in the six sensor
+channels. Remove the main magnet, keep it far from the rig, and place the rig at
+the mechanical `(0, 0, 0)` home pose.
 
-- Constant per-channel sensor bias
-- Relative channel gains and axis alignment where observable
-- The world-frame ambient magnetic field
-- Static noise and repeatability
+1. Let both sensors settle.
+2. Record several batches of raw readings without moving the rig.
+3. Compute the mean and standard deviation of each of the six channels.
+4. Save the six means as the static offsets.
+5. For all later magnet-in data, use `corrected = raw - static_offset`.
 
-Do not subtract one home-pose magnetic vector from every orientation. The
-ambient field is fixed in the world but changes direction in a rotating sensor's
-frame, so it must be modeled using the known pose.
+Do not reuse the old offset file. The new raw samples, sample count, timestamp,
+and per-channel standard deviations must be saved with the result.
 
-**Output:** raw magnet-out data and `sensor_calibration.json`.
+**Output:** raw home-pose magnet-out samples and `sensor_offsets.json`.
 
-**Gate:** the calibrated magnet-out model predicts held-out magnet-out readings
-near the measured sensor noise.
+**Gate:** repeated batches at home produce consistent means and acceptable
+per-channel standard deviations.
 
 ### 4. Establish the IMU yaw reference
 
