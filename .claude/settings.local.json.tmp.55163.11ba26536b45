@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//home/jaetrobopi/mwrs3-2/env/**)",
+      "Read(//home/jaetrobopi/mwrs3-2/**)",
+      "Bash(/home/jaetrobopi/mwrs3-2/env/bin/python -m pip list)",
+      "Bash(cp *)",
+      "Bash(./env/bin/python *)",
+      "Bash(git check-ignore *)",
+      "Bash(echo \"env/\")",
+      "Bash(./.venv/bin/python -c \"import magpylib; print\\('magpylib ok in .venv'\\)\")",
+      "Bash(./env/bin/pip install *)",
+      "Bash(xargs -0 -r sed -i 's|#!/home/jaetrobopi/mwrs3-2/env/bin|#!/home/jaetrobopi/jin/magnetic_field_simulation_for_rollPitchYaw_estimation/env/bin|')",
+      "Bash(./env/bin/pip --version)",
+      "Bash(/home/jaetrobopi/jin/magnetic_field_simulation_for_rollPitchYaw_estimation/env/bin/python -c \"import magpylib, adafruit_tlv493d; print\\('ok'\\)\")",
+      "Bash(env/bin/python *)",
+      "Read(//dev/**)",
+      "Bash(lsusb)",
+      "Bash(env/bin/pip list *)",
+      "Bash(export PYTHONPATH=/home/jaetrobopi/jin/magnetic_field_simulation_for_rollPitchYaw_estimation)",
+      "Bash(git -C /home/jaetrobopi/jin/magnetic_field_simulation_for_rollPitchYaw_estimation log --oneline -15)",
+      "Bash(git -C /home/jaetrobopi/jin/magnetic_field_simulation_for_rollPitchYaw_estimation log --oneline -5)",
+      "Bash(git -C /home/jaetrobopi/jin/magnetic_field_simulation_for_rollPitchYaw_estimation status --short)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
+    ]
+  }
+}

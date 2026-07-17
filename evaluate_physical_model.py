@@ -1,5 +1,15 @@
 #!/usr/bin/env python3
-"""Evaluate the locked physical-only model and consume the verification set."""
+"""Evaluate the model against a labeled pose dataset.
+
+Default mode evaluates the manifest-locked verification file (consuming it as
+development evidence). Passing --data evaluates any other labeled CSV instead,
+for example the heading-compensated verification set with
+--yaw-column yaw_compensated_deg; that mode is for diagnostics, not final
+holdout evidence, and the report says so.
+
+Estimates are reported in the dial frame whenever yaw_zero_correction.json is
+present, so the truth labels must be in the dial frame too.
+"""
 
 import argparse
 import csv
@@ -10,7 +20,7 @@ from pathlib import Path
 
 import numpy as np
 
-from physical_estimator import PhysicalModelEstimator
+from physical_estimator import PhysicalModelEstimator, inclusive_range
 from physical_model import CHANNELS
 
 
@@ -37,11 +47,21 @@ def metrics(values, already_absolute=False):
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", type=Path, default=Path("dataset_manifest.json"))
+    parser.add_argument("--data", type=Path, default=None,
+                        help="labeled CSV to evaluate instead of the "
+                        "manifest-locked verification file")
+    parser.add_argument("--yaw-column", default="yaw_deg",
+                        help="truth yaw column, e.g. yaw_compensated_deg")
     parser.add_argument("--model", type=Path, default=Path("physical_model.json"))
+    parser.add_argument("--correction", type=Path,
+                        default=Path("yaw_zero_correction.json"))
     parser.add_argument("--output", type=Path,
                         default=Path("physical_model_verification_report.json"))
     parser.add_argument("--predictions-output", type=Path,
                         default=Path("physical_model_verification_predictions.csv"))
+    parser.add_argument("--yaw-margin-deg", type=float, default=0.0,
+                        help="widen the yaw search bounds, needed when truth "
+                        "extends past the workspace edge")
     parser.add_argument("--global-starts", type=int, default=1)
     parser.add_argument("--force", action="store_true")
     return parser.parse_args()
@@ -58,19 +78,48 @@ def main():
     if args.global_starts < 1:
         raise SystemExit("--global-starts must be at least 1")
 
-    with args.manifest.open() as source:
-        manifest = json.load(source)
-    entry = manifest["files"]["verification"]
-    verification_path = Path(entry["path"])
-    actual_hash = sha256_file(verification_path)
-    if actual_hash != entry["sha256"]:
-        raise ValueError("verification data no longer matches the locked manifest")
-    with verification_path.open(newline="") as source:
+    if args.data is None:
+        with args.manifest.open() as source:
+            manifest = json.load(source)
+        entry = manifest["files"]["verification"]
+        data_path = Path(entry["path"])
+        data_hash = sha256_file(data_path)
+        if data_hash != entry["sha256"]:
+            raise ValueError("verification data no longer matches the locked manifest")
+        report_type = "locked_verification_evaluation"
+        status_note = (
+            "consumed_development_evidence; a new untouched set is required "
+            "for any later final claim"
+        )
+    else:
+        data_path = args.data
+        data_hash = sha256_file(data_path)
+        report_type = "labeled_dataset_evaluation"
+        status_note = (
+            "diagnostic evaluation of a supplied dataset; not untouched "
+            "holdout evidence"
+        )
+    with data_path.open(newline="") as source:
         rows = list(csv.DictReader(source))
 
-    estimator = PhysicalModelEstimator(model_path=args.model)
+    estimator = PhysicalModelEstimator(
+        model_path=args.model, correction_path=args.correction
+    )
+    if args.yaw_margin_deg:
+        estimator.lower[0] -= args.yaw_margin_deg
+        estimator.upper[0] += args.yaw_margin_deg
+        yaw_values = inclusive_range(estimator.lower[0], estimator.upper[0], 10.0)
+        estimator.grid_poses = np.asarray([
+            (yaw, pitch, roll)
+            for yaw in yaw_values
+            for pitch in np.unique(estimator.grid_poses[:, 1])
+            for roll in np.unique(estimator.grid_poses[:, 2])
+        ])
+        estimator.grid_fields_mT = estimator._predict(estimator.grid_poses)
+
     truth = np.asarray([
-        [float(row[name]) for name in ("yaw_deg", "pitch_deg", "roll_deg")]
+        [float(row[name])
+         for name in (args.yaw_column, "pitch_deg", "roll_deg")]
         for row in rows
     ])
     measured = np.asarray([
@@ -99,22 +148,22 @@ def main():
     report = {
         "schema_version": 1,
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
-        "report_type": "physical_model_only_verification",
+        "report_type": report_type,
+        "status_note": status_note,
         "residual_correction_active": False,
-        "verification_status_after_report": (
-            "consumed_development_evidence; a new untouched set is required "
-            "after residual correction"
-        ),
         "inputs": {
-            "verification_path": str(verification_path),
-            "verification_sha256": actual_hash,
-            "verification_rows": len(rows),
+            "data_path": str(data_path),
+            "data_sha256": data_hash,
+            "rows": len(rows),
+            "yaw_truth_column": args.yaw_column,
             "model_path": str(args.model),
             "model_sha256": sha256_file(args.model),
+            "yaw_zero_offset_deg": estimator.yaw_zero_offset_deg,
         },
         "method": {
             "truth_used_as_estimator_seed": False,
             "recording_order_used_for_tracking": False,
+            "yaw_search_margin_deg": args.yaw_margin_deg,
             "coarse_grid_points": len(estimator.grid_poses),
             "global_starts_per_pose": args.global_starts,
             "local_optimizer": "bounded scipy.optimize.least_squares",
@@ -151,7 +200,7 @@ def main():
         json.dump(report, output, indent=2)
         output.write("\n")
 
-    print("Physical-model-only verification")
+    print(report_type)
     print(f"poses: {len(rows)}")
     for name in ("yaw", "pitch", "roll"):
         item = report["angle_error_deg"][name]
@@ -166,7 +215,6 @@ def main():
     )
     print(f"wrote report:      {args.output}")
     print(f"wrote predictions: {args.predictions_output}")
-    print("verification set is now consumed; record a new final holdout later")
 
 
 if __name__ == "__main__":
