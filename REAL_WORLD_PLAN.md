@@ -18,6 +18,9 @@ inputs to the new fit.
 - The mechanical home pose is `(yaw, pitch, roll) = (0, 0, 0)`.
 - The operating workspace is yaw `[-60, +60]`, pitch `[-10, +10]`, and roll
   `[-10, +10]` degrees.
+- Those bounds are not a full Cartesian box. Simultaneous pitch `-10` and roll
+  `-10` degrees is mechanically unreachable, so fitting and lookup generation
+  use only the measured reachable domain.
 - The Xsens IMU continues to provide roll, pitch, and yaw.
 - Roll and pitch are used directly from the IMU.
 - Only yaw is referenced at startup: hold the rig at mechanical home, average

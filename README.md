@@ -9,13 +9,15 @@ code, fitted models, lookup table, and recorded datasets remain available on the
 
 ## Current status
 
-The clean workflow, geometry priors, and home IMU yaw reference are defined. A
-coherent TLV493D reader now rejects incomplete conversion frames. Magnetic
-offsets, mount results, and calibration rows recorded before this reader must be
-repeated after its stability test passes.
+The coherent TLV493D reader and stability test, magnet-out offsets, fixed IMU
+yaw reference, and magnet-mount repeatability test have passed. The new
+calibration dataset contains 332 measured poses across the physically reachable
+workspace, including one separately recorded repair pose. The unreachable
+simultaneous pitch `-10` and roll `-10` corner is documented rather than treated
+as missing data.
 
-The carried-over geometry in `geometry_priors.json` has been checked by the
-user. The next task is the magnet-out sensor calibration.
+The next task is to record a separate, untouched verification dataset that is
+never used for model fitting or residual-correction training.
 
 ## Files
 
@@ -53,6 +55,8 @@ fresh conversion before averaging begins.
 - Mechanical home pose: `(0, 0, 0)`
 - Operating workspace: yaw `[-60, +60]`, pitch `[-10, +10]`, and roll
   `[-10, +10]` degrees
+- The workspace is not a full Cartesian box: simultaneous pitch `-10` and roll
+  `-10` degrees is mechanically unreachable and is excluded.
 - IMU pitch and roll are used directly
 - At the beginning of each session, the IMU yaw at mechanical home is averaged
   as `yaw0`; session yaw is `wrap180(yaw_raw - yaw0)`

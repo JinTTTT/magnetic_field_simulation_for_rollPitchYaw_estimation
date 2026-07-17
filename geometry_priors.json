@@ -27,7 +27,8 @@
     "yaw": [-60.0, 60.0],
     "pitch": [-10.0, 10.0],
     "roll": [-10.0, 10.0],
-    "source": "user-selected operating workspace for the clean calibration pipeline, updated 2026-07-17"
+    "source": "user-selected operating workspace for the clean calibration pipeline, updated 2026-07-17",
+    "reachability_note": "The bounds are not a full Cartesian box. Simultaneous pitch = -10 deg and roll = -10 deg is mechanically unreachable; fitting, lookup generation, verification, and live estimation must use only the measured reachable domain."
   },
   "pivot": {
     "position_mm": [0.0, 0.0, 0.0],
