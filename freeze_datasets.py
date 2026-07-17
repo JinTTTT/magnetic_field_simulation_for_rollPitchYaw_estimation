@@ -9,13 +9,13 @@ import json
 from pathlib import Path
 
 
-INPUTS = (
-    ("calibration", "calibration_data.csv", "physical_fit_and_residual_training"),
-    ("verification", "verification_data.csv", "untouched_final_evaluation_only"),
-    ("geometry_priors", "geometry_priors.json", "physical_fit_priors"),
-    ("sensor_offsets", "sensor_offsets.json", "measurement_preprocessing_provenance"),
-    ("imu_yaw_reference", "imu_yaw_reference.json", "pose_reference_provenance"),
-)
+POLICIES = {
+    "calibration": "physical_fit_and_residual_training",
+    "verification": "untouched_final_evaluation_only",
+    "geometry_priors": "physical_fit_priors",
+    "sensor_offsets": "measurement_preprocessing_provenance",
+    "imu_yaw_reference": "pose_reference_provenance",
+}
 
 
 def sha256_file(path):
@@ -63,6 +63,18 @@ def describe(path, role, policy):
 
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--calibration", type=Path,
+                        default=Path("calibration_data.csv"),
+                        help="dataset the model will be fitted on; must match "
+                        "what fit_physical_model.py actually consumes (e.g. a "
+                        "heading-compensated file), or the model/manifest hash "
+                        "lock will reject the pair")
+    parser.add_argument("--verification", type=Path,
+                        default=Path("verification_data.csv"))
+    parser.add_argument("--geometry", type=Path, default=Path("geometry_priors.json"))
+    parser.add_argument("--offsets", type=Path, default=Path("sensor_offsets.json"))
+    parser.add_argument("--yaw-reference", type=Path,
+                        default=Path("imu_yaw_reference.json"))
     parser.add_argument("--output", type=Path, default=Path("dataset_manifest.json"))
     parser.add_argument("--force", action="store_true")
     return parser.parse_args()
@@ -73,9 +85,16 @@ def main():
     if args.output.exists() and not args.force:
         raise SystemExit(f"refusing to overwrite {args.output}; pass --force")
 
+    paths = {
+        "calibration": args.calibration,
+        "verification": args.verification,
+        "geometry_priors": args.geometry,
+        "sensor_offsets": args.offsets,
+        "imu_yaw_reference": args.yaw_reference,
+    }
     files = {}
-    for role, filename, policy in INPUTS:
-        files[role] = describe(Path(filename), role, policy)
+    for role, path in paths.items():
+        files[role] = describe(path, role, POLICIES[role])
 
     manifest = {
         "schema_version": 1,

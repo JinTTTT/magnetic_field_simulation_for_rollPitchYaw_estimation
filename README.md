@@ -60,8 +60,10 @@ Pipeline scripts, in workflow order:
 - `compensate_verification_yaw.py` — same wander removal for verification data
 - `evaluate_physical_model.py` — evaluator; locked-holdout mode by default,
   `--data`/`--yaw-column` for other labeled sets
-- `live_3d_magnetic.py` — live 3D pose from the magnetic sensors only
-- `live_3d.py` — live magnetic estimate next to the Xsens reference
+- `verify_model.py` — one command: compensate + evaluate the verification data
+- `live_estimation.py` — live 3D pose from the magnetic sensors only
+- `live_estimation_vs_imu.py` — live magnetic estimate next to the Xsens
+  reference
 
 Support: `physical_model.py` (forward model), `physical_estimator.py`
 (inversion: coarse grid + bounded refinement + tracking),
@@ -102,29 +104,26 @@ env/bin/python compensate_calibration_yaw.py  # then refit; repeat until stable
 env/bin/python fit_yaw_zero_correction.py   # needs poses at known dial angles
 ```
 
-Evaluate (compensated-label diagnostic shown; omit `--data` to consume a
-locked holdout):
+Report performance on the verification data (compensation + evaluation):
 
 ```bash
-env/bin/python compensate_verification_yaw.py
-env/bin/python evaluate_physical_model.py \
-  --data verification_data_yaw_compensated.csv --yaw-column yaw_compensated_deg \
-  --yaw-margin-deg 10 --global-starts 3 \
-  --output physical_model_compensated_verification_report.json \
-  --predictions-output physical_model_compensated_verification_predictions.csv
+env/bin/python verify_model.py
 ```
+
+(`evaluate_physical_model.py` without `--data` is reserved for consuming a
+future locked untouched holdout.)
 
 Run live (magnetic-only, dial-frame output):
 
 ```bash
-env/bin/python live_3d_magnetic.py
+env/bin/python live_estimation.py
 ```
 
 The status line shows the six-channel model RMS (~0.03 mT is healthy; a jump
 means a wrong tracking minimum or a physical change — retry with
-`--cold-start`). `live_3d.py` additionally shows the Xsens panel; its yaw
-comparison mixes frames (IMU heading wanders), so treat yaw "error" there as
-an IMU-drift display, not model error.
+`--cold-start`). `live_estimation_vs_imu.py` additionally shows the Xsens
+panel; its yaw comparison mixes frames (IMU heading wanders), so treat yaw
+"error" there as an IMU-drift display, not model error.
 
 All magnetic acquisition uses the shared coherent reader
 (`tools/tlv493d_coherent.py`): a TLV493D frame is accepted only with `CHANNEL`

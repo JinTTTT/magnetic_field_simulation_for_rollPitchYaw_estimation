@@ -51,13 +51,14 @@ Each step gates the next; each writes raw samples plus a JSON report.
    stored SHA-locked in `yaw_zero_correction.json` and auto-applied by the
    estimator. Re-fit whenever the model is refit or anything rotates
    mechanically. Unnecessary once calibration is dial-labeled.
-8. **Verification** (`compensate_verification_yaw.py` +
-   `evaluate_physical_model.py`) — separate session, never used in fitting.
-   IMU-labeled sets need heading compensation first and then measure only
-   pose-dependent + random error; absolute yaw needs dial-labeled poses.
-9. **Live estimation** (`live_3d_magnetic.py`) — magnetic sensors only,
-   dial-frame output, model-RMS health readout, tracking with global
-   reacquisition fallback.
+8. **Verification** (`verify_model.py`, wrapping
+   `compensate_verification_yaw.py` + `evaluate_physical_model.py`) —
+   separate session, never used in fitting. IMU-labeled sets need heading
+   compensation first and then measure only pose-dependent + random error;
+   absolute yaw needs dial-labeled poses.
+9. **Live estimation** (`live_estimation.py`; `live_estimation_vs_imu.py` to
+   compare against the IMU) — magnetic sensors only, dial-frame output,
+   model-RMS health readout, tracking with global reacquisition fallback.
 
 ## Status after the first cycle (2026-07-17)
 

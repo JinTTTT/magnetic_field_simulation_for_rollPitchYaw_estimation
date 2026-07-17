@@ -9,7 +9,12 @@ import time
 
 import numpy as np
 
-from live_3d import configure_panel, set_orientation, angle_title, load_locked_json
+from live_estimation_vs_imu import (
+    configure_panel,
+    set_orientation,
+    angle_title,
+    load_locked_json,
+)
 from physical_estimator import PhysicalModelEstimator
 from tools.tlv493d_coherent import (
     READER_TYPE,

@@ -20,7 +20,7 @@ from pathlib import Path
 
 import numpy as np
 
-from physical_estimator import PhysicalModelEstimator, inclusive_range
+from physical_estimator import PhysicalModelEstimator
 from physical_model import CHANNELS
 
 
@@ -105,17 +105,7 @@ def main():
     estimator = PhysicalModelEstimator(
         model_path=args.model, correction_path=args.correction
     )
-    if args.yaw_margin_deg:
-        estimator.lower[0] -= args.yaw_margin_deg
-        estimator.upper[0] += args.yaw_margin_deg
-        yaw_values = inclusive_range(estimator.lower[0], estimator.upper[0], 10.0)
-        estimator.grid_poses = np.asarray([
-            (yaw, pitch, roll)
-            for yaw in yaw_values
-            for pitch in np.unique(estimator.grid_poses[:, 1])
-            for roll in np.unique(estimator.grid_poses[:, 2])
-        ])
-        estimator.grid_fields_mT = estimator._predict(estimator.grid_poses)
+    estimator.widen_yaw_bounds(args.yaw_margin_deg)
 
     truth = np.asarray([
         [float(row[name])

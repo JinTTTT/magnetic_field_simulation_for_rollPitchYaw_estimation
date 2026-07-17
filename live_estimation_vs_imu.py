@@ -196,7 +196,7 @@ def run(args):
     estimate_axis = figure.add_subplot(1, 2, 1, projection="3d")
     truth_axis = figure.add_subplot(1, 2, 2, projection="3d")
     estimate_artists = configure_panel(estimate_axis, "Magnetic estimate")
-    truth_artists = configure_panel(truth_axis, "Xsens reference")
+    truth_artists = configure_panel(truth_axis, "Xsens reference (yaw may drift)")
     figure.suptitle("Ball-joint orientation — physical model only", fontsize=15)
     status = figure.text(0.5, 0.025, "Waiting for measurements...",
                          ha="center", fontsize=10)
@@ -212,7 +212,7 @@ def run(args):
         set_orientation(estimate_artists, estimate)
         set_orientation(truth_artists, truth)
         estimate_axis.set_title(angle_title("Magnetic estimate", estimate), pad=12)
-        truth_axis.set_title(angle_title("Xsens reference", truth), pad=12)
+        truth_axis.set_title(angle_title("Xsens reference (yaw may drift)", truth), pad=12)
         absolute = np.abs((estimate - truth + 180.0) % 360.0 - 180.0)
         mode = "global reacquisition" if reacquired else "tracking"
         status.set_text(

@@ -25,7 +25,7 @@ from pathlib import Path
 import numpy as np
 
 from measure_imu_yaw_reference import wrap180
-from physical_estimator import PhysicalModelEstimator, inclusive_range
+from physical_estimator import PhysicalModelEstimator
 from physical_model import CHANNELS
 
 STATIONS_DEG = np.arange(-55.0, 56.0, 10.0)
@@ -89,16 +89,7 @@ def main():
     estimator = PhysicalModelEstimator(
         model_path=args.model, correction_path=args.correction
     )
-    estimator.lower[0] -= args.yaw_margin_deg
-    estimator.upper[0] += args.yaw_margin_deg
-    yaw_values = inclusive_range(estimator.lower[0], estimator.upper[0], 10.0)
-    estimator.grid_poses = np.asarray([
-        (yaw, pitch, roll)
-        for yaw in yaw_values
-        for pitch in np.unique(estimator.grid_poses[:, 1])
-        for roll in np.unique(estimator.grid_poses[:, 2])
-    ])
-    estimator.grid_fields_mT = estimator._predict(estimator.grid_poses)
+    estimator.widen_yaw_bounds(args.yaw_margin_deg)
     print(f"estimating {len(rows)} poses "
           f"(yaw zero correction {estimator.yaw_zero_offset_deg:+.3f} deg, "
           f"yaw search bounds ±{args.yaw_margin_deg:.0f} deg widened)...")

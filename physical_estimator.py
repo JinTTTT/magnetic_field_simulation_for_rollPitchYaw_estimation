@@ -55,13 +55,17 @@ class PhysicalModelEstimator:
         self.upper = np.asarray((workspace["yaw"][1], workspace["pitch"][1],
                                  workspace["roll"][1]), dtype=float)
         self.x_scale = np.maximum((self.upper - self.lower) / 4.0, 1.0)
+        self.yaw_step_deg = yaw_step_deg
+        self.tilt_step_deg = tilt_step_deg
+        self._build_grid()
 
-        yaw_values = inclusive_range(self.lower[0], self.upper[0], yaw_step_deg)
+    def _build_grid(self):
+        yaw_values = inclusive_range(self.lower[0], self.upper[0], self.yaw_step_deg)
         pitch_values = inclusive_range(
-            self.lower[1], self.upper[1], tilt_step_deg
+            self.lower[1], self.upper[1], self.tilt_step_deg
         )
         roll_values = inclusive_range(
-            self.lower[2], self.upper[2], tilt_step_deg
+            self.lower[2], self.upper[2], self.tilt_step_deg
         )
         self.grid_poses = np.asarray([
             (yaw, pitch, roll)
@@ -70,6 +74,14 @@ class PhysicalModelEstimator:
             for roll in roll_values
         ])
         self.grid_fields_mT = self._predict(self.grid_poses)
+
+    def widen_yaw_bounds(self, margin_deg):
+        """Extend the yaw search range, e.g. when truth labels carry a frame
+        offset that pushes poses past the mechanical workspace edge."""
+        if margin_deg:
+            self.lower[0] -= float(margin_deg)
+            self.upper[0] += float(margin_deg)
+            self._build_grid()
 
     def _predict(self, angles):
         shifted = np.atleast_2d(np.asarray(angles, dtype=float)).copy()

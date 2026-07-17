@@ -5,3 +5,4 @@ env/
 # python
 __pycache__/
 *.pyc
+.claude/
