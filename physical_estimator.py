@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Invert the accepted physical model from six magnetic channels to a pose."""
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -10,15 +11,42 @@ from scipy.optimize import least_squares
 from physical_model import load_model, predict_mT
 
 
+def load_yaw_zero_offset(correction_path, model_path):
+    """Load the model-frame-to-dial-frame yaw offset fitted for this model."""
+    correction_path = Path(correction_path)
+    if not correction_path.exists():
+        return 0.0
+    with correction_path.open() as source:
+        correction = json.load(source)
+    if correction.get("schema_version") != 1:
+        raise ValueError(f"unsupported yaw correction schema in {correction_path}")
+    digest = hashlib.sha256()
+    with Path(model_path).open("rb") as source:
+        for block in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(block)
+    if correction["inputs"]["model_sha256"] != digest.hexdigest():
+        raise ValueError(
+            f"{correction_path} was fitted for a different physical model"
+        )
+    return float(correction["yaw_zero_offset_deg"])
+
+
 class PhysicalModelEstimator:
-    """Coarse global field search followed by bounded nonlinear refinement."""
+    """Coarse global field search followed by bounded nonlinear refinement.
+
+    Poses are searched and reported in the mechanical dial frame; the model is
+    evaluated at yaw + yaw_zero_offset_deg because its calibration labels are
+    rotated from that frame by a constant heading error.
+    """
 
     def __init__(self, model_path=Path("physical_model.json"),
                  geometry_path=Path("geometry_priors.json"),
+                 correction_path=Path("yaw_zero_correction.json"),
                  yaw_step_deg=10.0, tilt_step_deg=5.0):
         self.model = load_model(model_path)
         if not self.model.get("calibration_gate_passed", False):
             raise ValueError(f"{model_path} has not passed its calibration gate")
+        self.yaw_zero_offset_deg = load_yaw_zero_offset(correction_path, model_path)
         with Path(geometry_path).open() as source:
             geometry = json.load(source)
         workspace = geometry["workspace_deg"]
@@ -41,10 +69,15 @@ class PhysicalModelEstimator:
             for pitch in pitch_values
             for roll in roll_values
         ])
-        self.grid_fields_mT = predict_mT(self.grid_poses, self.model)
+        self.grid_fields_mT = self._predict(self.grid_poses)
+
+    def _predict(self, angles):
+        shifted = np.atleast_2d(np.asarray(angles, dtype=float)).copy()
+        shifted[:, 0] += self.yaw_zero_offset_deg
+        return predict_mT(shifted, self.model)
 
     def _residual(self, angles, measured_mT):
-        return predict_mT(angles, self.model)[0] - measured_mT
+        return self._predict(angles)[0] - measured_mT
 
     def _refine(self, start, measured_mT):
         return least_squares(

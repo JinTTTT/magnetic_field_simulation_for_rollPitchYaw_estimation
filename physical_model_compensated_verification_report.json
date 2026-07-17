@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-07-17T16:05:27.279659+00:00",
+  "report_type": "yaw_corrected_model_vs_heading_compensated_labels",
+  "not_an_untouched_holdout": "yaw labels were compensated with a model-derived smooth-in-time heading error; yaw metrics cover pose-dependent and random error only, not absolute frame accuracy",
+  "residual_correction_active": false,
+  "inputs": {
+    "data_path": "verification_data_yaw_compensated.csv",
+    "data_sha256": "7db97d85570c9fe0ea4d07e963b72ad93cce378bf355ddce6176223ef391fa4a",
+    "rows": 60,
+    "model_path": "physical_model.json",
+    "model_sha256": "6429a28202ce729ef20325f3dfde9017af54921fd2a7f52e9f3236ce242b0afb",
+    "yaw_correction_path": "yaw_zero_correction.json",
+    "yaw_correction_sha256": "be79267bd979897d1c9c223d6a36d5400a3dc4d3efc24aa21b1f2a4afdaf438c",
+    "yaw_zero_offset_deg": 5.380536635908835
+  },
+  "method": {
+    "truth_used_as_estimator_seed": false,
+    "recording_order_used_for_tracking": false,
+    "yaw_search_margin_deg": 10.0,
+    "coarse_grid_points": 375,
+    "global_starts_per_pose": 3,
+    "local_optimizer": "bounded scipy.optimize.least_squares",
+    "median_function_evaluations": 7.0
+  },
+  "angle_error_deg": {
+    "yaw": {
+      "mae": 0.5341421836636385,
+      "rmse": 0.6239544905683668,
+      "median_absolute": 0.4852619009403156,
+      "p95_absolute": 1.1178786448466325,
+      "maximum_absolute": 1.2401899874593596
+    },
+    "pitch": {
+      "mae": 0.31497748799075187,
+      "rmse": 0.44327695749982854,
+      "median_absolute": 0.2238423871396541,
+      "p95_absolute": 0.9039480545403407,
+      "maximum_absolute": 1.4801622606559146
+    },
+    "roll": {
+      "mae": 0.6024097300377117,
+      "rmse": 0.7518933381491155,
+      "median_absolute": 0.5007256676073314,
+      "p95_absolute": 1.4513120815176215,
+      "maximum_absolute": 1.8693426175674732
+    }
+  },
+  "worst_axis_error_deg": {
+    "mae": 0.7890702416432257,
+    "rmse": 0.8790870740448496,
+    "median_absolute": 0.7642488084638561,
+    "p95_absolute": 1.4513120815176215,
+    "maximum_absolute": 1.8693426175674732
+  },
+  "euclidean_angle_error_deg": {
+    "mae": 0.9589264429842325,
+    "rmse": 1.0729199687319437,
+    "median_absolute": 0.8876438661441608,
+    "p95_absolute": 1.8305703723479703,
+    "maximum_absolute": 2.394822570758394
+  },
+  "optimized_field_rms_mT": {
+    "mae": 0.028168411195030958,
+    "rmse": 0.030438939039281167,
+    "median_absolute": 0.02766752835780889,
+    "p95_absolute": 0.04624073024838045,
+    "maximum_absolute": 0.06097022257376645
+  }
+}
