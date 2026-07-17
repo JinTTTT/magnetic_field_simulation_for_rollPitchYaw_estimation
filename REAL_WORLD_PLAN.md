@@ -48,8 +48,9 @@ Measure and record:
 - IMU mounting direction
 - Measurement uncertainty for every dimension
 
-These values are initial guesses and fitting priors, not unquestioned exact
-geometry.
+These values are initial guesses and fitting priors, not fixed optimization
+results. When a measured uncertainty is unavailable, define a conservative
+fitting bound before optimizing that parameter.
 
 **Output:** `geometry_priors.json`.
 

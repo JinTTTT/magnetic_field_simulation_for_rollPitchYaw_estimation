@@ -1,7 +1,11 @@
 {
   "schema_version": 1,
-  "status": "draft_requires_remeasurement",
+  "status": "user_verified_priors",
   "purpose": "Directly measured or nominal rig values used only as initial guesses and fitting priors. This file contains no fitted calibration results.",
+  "verification": {
+    "date": "2026-07-17",
+    "note": "User verified the carried-over physical parameters and corrected the magnet center to z = 28 mm, 8 mm above the sensor plane."
+  },
   "coordinate_system": {
     "origin": "ball-joint pivot",
     "axes": {
@@ -75,9 +79,9 @@
       "source": "magnet specification; verify the installed part"
     },
     "home_center_position_mm": {
-      "value": [0.0, 0.0, 35.0],
+      "value": [0.0, 0.0, 28.0],
       "uncertainty": null,
-      "source": "proof-of-concept nominal measurement: 15 mm above the 20 mm sensor plane; re-measure before fitting"
+      "source": "user-verified rig measurement: 8 mm above the 20 mm sensor plane"
     },
     "axis_direction_at_home": {
       "value": [1.0, 0.0, 0.0],
@@ -96,8 +100,7 @@
     "note": "Do not copy the old fitted IMU mount rotation. Validate the reader axis convention and startup yaw reference during the IMU step."
   },
   "required_before_model_fitting": [
-    "Re-measure all entries whose uncertainty is null.",
-    "Record the measurement method and uncertainty for each physical value.",
+    "Choose explicit fitting bounds or conservative prior uncertainties for values whose measurement uncertainty is unavailable.",
     "Complete the new magnet-out sensor calibration.",
     "Validate the IMU yaw-at-home convention."
   ]

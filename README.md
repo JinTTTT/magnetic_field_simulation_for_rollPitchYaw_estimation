@@ -13,8 +13,8 @@ The clean workflow is defined, and the directly measured rig geometry has been
 separated from old fitted parameters. No new sensor calibration, model fit, or
 lookup table exists yet on this branch.
 
-The next task is to review and re-measure the values in
-`geometry_priors.json`, including an uncertainty for every physical dimension.
+The carried-over geometry in `geometry_priors.json` has been checked by the
+user. The next task is the magnet-out sensor calibration.
 
 ## Files
 
