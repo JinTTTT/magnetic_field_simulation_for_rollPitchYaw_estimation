@@ -13,10 +13,11 @@ poses covering the calibrated workspace. Its resolution is 0.5 degrees in yaw
 and 1 degree in pitch and roll.
 
 At startup, the stored field vectors are indexed by a six-dimensional KD-tree.
-For every measurement, the estimator finds the table entry with the nearest
-six-channel field and directly returns that entry's yaw, pitch, and roll. No
-iterative pose optimization runs during estimation. The output is therefore
-quantized to the table resolution.
+Each new six-channel sensor measurement is offset-corrected and passed through
+an exponential moving average with alpha 0.2. The estimator immediately finds
+the table entry with the nearest filtered field and returns that entry's yaw,
+pitch, and roll. No block-average acquisition or iterative pose optimization
+runs during estimation. The output is quantized to the table resolution.
 
 The reported model RMS is the root-mean-square difference between the measured
 field and the selected table entry. It should be monitored as the fit/confidence
@@ -29,6 +30,13 @@ Magnetic estimate only:
 
 ```bash
 env/bin/python live_estimation.py
+```
+
+The EMA can be tuned at runtime. A larger alpha responds faster but passes more
+sensor noise; a smaller alpha is smoother but adds more lag:
+
+```bash
+env/bin/python live_estimation.py --ema-alpha 0.2
 ```
 
 Magnetic estimate beside the Xsens reference:
@@ -72,7 +80,7 @@ config/
 data/
   calibration.csv        original calibration recording
   verification.csv       original verification recording
-magnetic_pose/            shared model, lookup, hardware, IMU, and plotting code
+magnetic_pose/            shared model, lookup, filtering, hardware, IMU, and plotting code
 results/
   calibration_report.json
   dial_frame_check.json

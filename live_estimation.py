@@ -4,13 +4,13 @@
 import argparse
 from pathlib import Path
 import threading
-import time
 
 import numpy as np
 
 from magnetic_pose.config import (
     LOOKUP_PATH, MODEL_PATH, OFFSETS_PATH, load_sensor_offsets,
 )
+from magnetic_pose.filtering import DEFAULT_EMA_ALPHA, ExponentialMovingAverage
 from magnetic_pose.lookup import PoseEstimator
 from magnetic_pose.plotting import angle_title, configure_panel, set_orientation
 from magnetic_pose.tlv493d import open_sensor_pair, prime_sensor_pair, read_pair_mT
@@ -41,22 +41,18 @@ class MagneticSource:
         with self.lock:
             return self.angles.copy(), self.error
 
-    def _read_fields(self):
-        prime_sensor_pair(self.sensors)
-        samples = []
-        for _ in range(self.args.samples):
-            samples.append(read_pair_mT(self.sensors))
-            if self.args.sample_delay:
-                time.sleep(self.args.sample_delay)
-        return np.mean(samples, axis=0) - self.offsets
-
     def _run(self):
         try:
+            prime_sensor_pair(self.sensors)
+            field_filter = ExponentialMovingAverage(self.args.ema_alpha)
             while not self.stop_event.is_set():
-                fields = self._read_fields()
+                measured = np.asarray(read_pair_mT(self.sensors)) - self.offsets
+                fields = field_filter.update(measured)
                 result = self.estimator.estimate(fields)
                 with self.lock:
                     self.angles = result["angles_deg"]
+                if self.args.sample_delay:
+                    self.stop_event.wait(self.args.sample_delay)
         except Exception as error:
             with self.lock:
                 self.error = error
@@ -108,14 +104,14 @@ def parse_args():
     parser.add_argument("--model", type=Path, default=MODEL_PATH)
     parser.add_argument("--offsets", type=Path, default=OFFSETS_PATH)
     parser.add_argument("--lookup-table", type=Path, default=LOOKUP_PATH)
-    parser.add_argument("--samples", type=int, default=8)
+    parser.add_argument("--ema-alpha", type=float, default=DEFAULT_EMA_ALPHA)
     parser.add_argument("--sample-delay", type=float, default=0.03)
     parser.add_argument("--refresh-ms", type=int, default=100)
     parser.add_argument("--bus1", type=int, default=3)
     parser.add_argument("--bus2", type=int, default=4)
     args = parser.parse_args()
-    if args.samples < 1:
-        parser.error("--samples must be positive")
+    if not 0.0 < args.ema_alpha <= 1.0:
+        parser.error("--ema-alpha must be greater than zero and at most one")
     if args.sample_delay < 0:
         parser.error("--sample-delay cannot be negative")
     return args
