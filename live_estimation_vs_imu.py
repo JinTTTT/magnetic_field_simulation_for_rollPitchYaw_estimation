@@ -17,6 +17,9 @@ from magnetic_pose.plotting import angle_title, configure_panel, set_orientation
 from magnetic_pose.tlv493d import open_sensor_pair, prime_sensor_pair, read_pair_mT
 
 
+XSENS_TITLE = "Ground truth reference: Xsens MTi-630 IMU"
+
+
 class ComparisonSource:
     def __init__(self, args):
         import serial
@@ -36,7 +39,6 @@ class ComparisonSource:
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.estimate = np.zeros(3)
         self.reference = np.zeros(3)
-        self.rms = np.nan
         self.error = None
 
     def start(self):
@@ -69,11 +71,6 @@ class ComparisonSource:
             raise
 
         print("magnetic model yaw frame: mechanical dial")
-        print(
-            f"KD-tree lookup estimator: {len(self.estimator.grid_poses)} poses "
-            f"(yaw {self.estimator.yaw_step:g} deg, "
-            f"pitch/roll {self.estimator.tilt_step:g} deg)"
-        )
         self.thread.start()
 
     def stop(self):
@@ -85,8 +82,7 @@ class ComparisonSource:
     def snapshot(self):
         with self.lock:
             return (
-                self.estimate.copy(), self.reference.copy(), self.rms,
-                self.error,
+                self.estimate.copy(), self.reference.copy(), self.error,
             )
 
     def _read_fields(self):
@@ -110,7 +106,6 @@ class ComparisonSource:
                 with self.lock:
                     self.estimate = result["angles_deg"]
                     self.reference = reference
-                    self.rms = result["model_rms_mT"]
         except Exception as error:
             with self.lock:
                 self.error = error
@@ -126,12 +121,12 @@ def run(args):
     estimate_axis = figure.add_subplot(1, 2, 1, projection="3d")
     reference_axis = figure.add_subplot(1, 2, 2, projection="3d")
     estimate_artists = configure_panel(estimate_axis, "Magnetic estimate")
-    reference_artists = configure_panel(reference_axis, "Xsens reference")
+    reference_artists = configure_panel(reference_axis, XSENS_TITLE)
     status = figure.text(0.5, 0.025, "Waiting for measurements...", ha="center")
     figure.subplots_adjust(left=0.03, right=0.97, bottom=0.1, top=0.9, wspace=0.08)
 
     def update(_frame):
-        estimate, reference, rms, error = source.snapshot()
+        estimate, reference, error = source.snapshot()
         if error:
             status.set_text(f"Acquisition stopped: {error}")
             status.set_color("#b00020")
@@ -139,12 +134,11 @@ def run(args):
         set_orientation(estimate_artists, estimate)
         set_orientation(reference_artists, reference)
         estimate_axis.set_title(angle_title("Magnetic estimate", estimate), pad=12)
-        reference_axis.set_title(angle_title("Xsens reference", reference), pad=12)
+        reference_axis.set_title(angle_title(XSENS_TITLE, reference), pad=12)
         error_deg = np.abs((estimate - reference + 180.0) % 360.0 - 180.0)
         status.set_text(
             f"Error: yaw {error_deg[0]:.2f}°   pitch {error_deg[1]:.2f}°   "
-            f"roll {error_deg[2]:.2f}°     model RMS {rms:.3f} mT     "
-            "KD-tree lookup"
+            f"roll {error_deg[2]:.2f}°"
         )
         return ()
 

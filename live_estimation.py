@@ -27,16 +27,10 @@ class MagneticSource:
         self.lock = threading.Lock()
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.angles = np.zeros(3)
-        self.rms = np.nan
         self.error = None
 
     def start(self):
         print("magnetic model yaw frame: mechanical dial")
-        print(
-            f"KD-tree lookup estimator: {len(self.estimator.grid_poses)} poses "
-            f"(yaw {self.estimator.yaw_step:g} deg, "
-            f"pitch/roll {self.estimator.tilt_step:g} deg)"
-        )
         self.thread.start()
 
     def stop(self):
@@ -45,7 +39,7 @@ class MagneticSource:
 
     def snapshot(self):
         with self.lock:
-            return self.angles.copy(), self.rms, self.error
+            return self.angles.copy(), self.error
 
     def _read_fields(self):
         prime_sensor_pair(self.sensors)
@@ -63,7 +57,6 @@ class MagneticSource:
                 result = self.estimator.estimate(fields)
                 with self.lock:
                     self.angles = result["angles_deg"]
-                    self.rms = result["model_rms_mT"]
         except Exception as error:
             with self.lock:
                 self.error = error
@@ -82,14 +75,14 @@ def run(args):
     figure.subplots_adjust(left=0.05, right=0.95, bottom=0.1, top=0.9)
 
     def update(_frame):
-        angles, rms, error = source.snapshot()
+        angles, error = source.snapshot()
         if error:
             status.set_text(f"Acquisition stopped: {error}")
             status.set_color("#b00020")
             return ()
         set_orientation(artists, angles)
         axis.set_title(angle_title("Magnetic estimate", angles), pad=12)
-        status.set_text(f"model RMS {rms:.3f} mT     KD-tree lookup")
+        status.set_text("")
         return ()
 
     closed = False
