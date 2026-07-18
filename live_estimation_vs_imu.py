@@ -8,9 +8,11 @@ import time
 
 import numpy as np
 
-from magnetic_pose.config import MODEL_PATH, OFFSETS_PATH, load_sensor_offsets
-from magnetic_pose.estimator import PoseEstimator
+from magnetic_pose.config import (
+    LOOKUP_PATH, MODEL_PATH, OFFSETS_PATH, load_sensor_offsets,
+)
 from magnetic_pose.imu import LiveIMU, circular_mean_deg, wrap180, yaw_stddev_deg
+from magnetic_pose.lookup import PoseEstimator
 from magnetic_pose.plotting import angle_title, configure_panel, set_orientation
 from magnetic_pose.tlv493d import open_sensor_pair, prime_sensor_pair, read_pair_mT
 
@@ -21,7 +23,7 @@ class ComparisonSource:
 
         self.args = args
         self.offsets = load_sensor_offsets(args.offsets)
-        self.estimator = PoseEstimator(args.model)
+        self.estimator = PoseEstimator(args.model, args.lookup_table)
         _buses, self.sensors = open_sensor_pair(args.bus1, args.bus2)
 
         self.serial_port = serial.Serial(args.port, args.baud, timeout=0.1)
@@ -35,7 +37,6 @@ class ComparisonSource:
         self.estimate = np.zeros(3)
         self.reference = np.zeros(3)
         self.rms = np.nan
-        self.reacquired = False
         self.error = None
 
     def start(self):
@@ -68,7 +69,11 @@ class ComparisonSource:
             raise
 
         print("magnetic model yaw frame: mechanical dial")
-        print(f"coarse estimator grid: {len(self.estimator.grid_poses)} poses")
+        print(
+            f"KD-tree lookup estimator: {len(self.estimator.grid_poses)} poses "
+            f"(yaw {self.estimator.yaw_step:g} deg, "
+            f"pitch/roll {self.estimator.tilt_step:g} deg)"
+        )
         self.thread.start()
 
     def stop(self):
@@ -81,7 +86,7 @@ class ComparisonSource:
         with self.lock:
             return (
                 self.estimate.copy(), self.reference.copy(), self.rms,
-                self.reacquired, self.error,
+                self.error,
             )
 
     def _read_fields(self):
@@ -94,7 +99,6 @@ class ComparisonSource:
         return np.mean(samples, axis=0) - self.offsets
 
     def _run(self):
-        previous = None
         try:
             while not self.stop_event.is_set():
                 fields = self._read_fields()
@@ -102,18 +106,11 @@ class ComparisonSource:
                 reference = np.array([
                     wrap180(raw_yaw - self.imu_yaw_zero), pitch, roll
                 ])
-                result = self.estimator.estimate(
-                    fields,
-                    seed=None if self.args.cold_start else previous,
-                    global_starts=self.args.global_starts,
-                    reacquire_threshold_mT=self.args.reacquire_threshold_mT,
-                )
-                previous = result["angles_deg"]
+                result = self.estimator.estimate(fields)
                 with self.lock:
                     self.estimate = result["angles_deg"]
                     self.reference = reference
                     self.rms = result["model_rms_mT"]
-                    self.reacquired = result["reacquired"]
         except Exception as error:
             with self.lock:
                 self.error = error
@@ -134,7 +131,7 @@ def run(args):
     figure.subplots_adjust(left=0.03, right=0.97, bottom=0.1, top=0.9, wspace=0.08)
 
     def update(_frame):
-        estimate, reference, rms, reacquired, error = source.snapshot()
+        estimate, reference, rms, error = source.snapshot()
         if error:
             status.set_text(f"Acquisition stopped: {error}")
             status.set_color("#b00020")
@@ -144,10 +141,10 @@ def run(args):
         estimate_axis.set_title(angle_title("Magnetic estimate", estimate), pad=12)
         reference_axis.set_title(angle_title("Xsens reference", reference), pad=12)
         error_deg = np.abs((estimate - reference + 180.0) % 360.0 - 180.0)
-        mode = "reacquired" if reacquired else "tracking"
         status.set_text(
             f"Error: yaw {error_deg[0]:.2f}°   pitch {error_deg[1]:.2f}°   "
-            f"roll {error_deg[2]:.2f}°     model RMS {rms:.3f} mT     {mode}"
+            f"roll {error_deg[2]:.2f}°     model RMS {rms:.3f} mT     "
+            "KD-tree lookup"
         )
         return ()
 
@@ -173,25 +170,23 @@ def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", type=Path, default=MODEL_PATH)
     parser.add_argument("--offsets", type=Path, default=OFFSETS_PATH)
+    parser.add_argument("--lookup-table", type=Path, default=LOOKUP_PATH)
     parser.add_argument("--imu-zero-seconds", type=float, default=1.0)
     parser.add_argument("--imu-zero-max-stddev-deg", type=float, default=0.25)
     parser.add_argument("--samples", type=int, default=8)
     parser.add_argument("--sample-delay", type=float, default=0.03)
     parser.add_argument("--refresh-ms", type=int, default=100)
-    parser.add_argument("--global-starts", type=int, default=3)
-    parser.add_argument("--reacquire-threshold-mT", type=float, default=0.25)
-    parser.add_argument("--cold-start", action="store_true")
     parser.add_argument("--bus1", type=int, default=3)
     parser.add_argument("--bus2", type=int, default=4)
     parser.add_argument("--port", default="/dev/ttyUSB0")
     parser.add_argument("--baud", type=int, default=921600)
     args = parser.parse_args()
-    if min(args.samples, args.global_starts) < 1:
-        parser.error("--samples and --global-starts must be positive")
+    if args.samples < 1:
+        parser.error("--samples must be positive")
     if args.imu_zero_seconds <= 0 or args.imu_zero_max_stddev_deg < 0:
         parser.error("invalid IMU zeroing settings")
-    if min(args.sample_delay, args.reacquire_threshold_mT) < 0:
-        parser.error("delays and thresholds cannot be negative")
+    if args.sample_delay < 0:
+        parser.error("--sample-delay cannot be negative")
     return args
 
 

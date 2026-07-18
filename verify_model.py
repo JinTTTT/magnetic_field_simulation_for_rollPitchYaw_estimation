@@ -10,10 +10,10 @@ from pathlib import Path
 import numpy as np
 
 from magnetic_pose.config import (
-    MODEL_PATH, ROOT, VERIFICATION_PATH, VERIFICATION_REPORT_PATH,
+    LOOKUP_PATH, MODEL_PATH, ROOT, VERIFICATION_PATH, VERIFICATION_REPORT_PATH,
 )
-from magnetic_pose.estimator import PoseEstimator
 from magnetic_pose.imu import wrap180
+from magnetic_pose.lookup import PoseEstimator
 from magnetic_pose.model import CHANNELS
 
 
@@ -48,7 +48,7 @@ def display_path(path):
         return str(path)
 
 
-def verify(data_path, model_path, knot_spacing, global_starts):
+def verify(data_path, model_path, knot_spacing, lookup_path=LOOKUP_PATH):
     with Path(data_path).open(newline="") as source:
         rows = sorted(csv.DictReader(source), key=lambda row: row["recorded_at_utc"])
     if not rows:
@@ -68,10 +68,9 @@ def verify(data_path, model_path, knot_spacing, global_starts):
         for row in rows
     ])
 
-    estimator = PoseEstimator(model_path)
-    estimator.widen_yaw_bounds(10.0)
+    estimator = PoseEstimator(model_path, lookup_path)
     estimates = np.array([
-        estimator.estimate(field, global_starts=global_starts)["angles_deg"]
+        estimator.estimate(field)["angles_deg"]
         for field in fields
     ])
 
@@ -114,6 +113,13 @@ def verify(data_path, model_path, knot_spacing, global_starts):
             "knot_times_s": knots.tolist(),
             "values": coefficients[:knot_count].tolist(),
         },
+        "estimator": {
+            "type": "nearest_lookup_kdtree",
+            "lookup_table": display_path(lookup_path),
+            "poses": len(estimator.grid_poses),
+            "yaw_step_deg": estimator.yaw_step,
+            "pitch_roll_step_deg": estimator.tilt_step,
+        },
     }
 
 
@@ -122,19 +128,24 @@ def main():
     parser.add_argument("--data", type=Path, default=VERIFICATION_PATH)
     parser.add_argument("--model", type=Path, default=MODEL_PATH)
     parser.add_argument("--output", type=Path, default=VERIFICATION_REPORT_PATH)
+    parser.add_argument("--lookup-table", type=Path, default=LOOKUP_PATH)
     parser.add_argument("--knot-spacing", type=float, default=90.0)
-    parser.add_argument("--global-starts", type=int, default=3)
     args = parser.parse_args()
-    if args.knot_spacing <= 0 or args.global_starts < 1:
-        parser.error("spacing and global starts must be positive")
+    if args.knot_spacing <= 0:
+        parser.error("--knot-spacing must be positive")
 
-    report = verify(args.data, args.model, args.knot_spacing, args.global_starts)
+    report = verify(
+        args.data,
+        args.model,
+        args.knot_spacing,
+        lookup_path=args.lookup_table,
+    )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with args.output.open("w") as output:
         json.dump(report, output, indent=2)
         output.write("\n")
 
-    print(f"verified {report['poses']} poses")
+    print(f"verified {report['poses']} poses using KD-tree lookup")
     for axis, values in report["error_deg"].items():
         print(f"{axis:5s}: MAE {values['mae']:.3f}°   max {values['max']:.3f}°")
     print(f"report: {args.output}")

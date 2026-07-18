@@ -8,8 +8,10 @@ import time
 
 import numpy as np
 
-from magnetic_pose.config import MODEL_PATH, OFFSETS_PATH, load_sensor_offsets
-from magnetic_pose.estimator import PoseEstimator
+from magnetic_pose.config import (
+    LOOKUP_PATH, MODEL_PATH, OFFSETS_PATH, load_sensor_offsets,
+)
+from magnetic_pose.lookup import PoseEstimator
 from magnetic_pose.plotting import angle_title, configure_panel, set_orientation
 from magnetic_pose.tlv493d import open_sensor_pair, prime_sensor_pair, read_pair_mT
 
@@ -18,7 +20,7 @@ class MagneticSource:
     def __init__(self, args):
         self.args = args
         self.offsets = load_sensor_offsets(args.offsets)
-        self.estimator = PoseEstimator(args.model)
+        self.estimator = PoseEstimator(args.model, args.lookup_table)
         _buses, self.sensors = open_sensor_pair(args.bus1, args.bus2)
 
         self.stop_event = threading.Event()
@@ -26,12 +28,15 @@ class MagneticSource:
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.angles = np.zeros(3)
         self.rms = np.nan
-        self.reacquired = False
         self.error = None
 
     def start(self):
         print("magnetic model yaw frame: mechanical dial")
-        print(f"coarse estimator grid: {len(self.estimator.grid_poses)} poses")
+        print(
+            f"KD-tree lookup estimator: {len(self.estimator.grid_poses)} poses "
+            f"(yaw {self.estimator.yaw_step:g} deg, "
+            f"pitch/roll {self.estimator.tilt_step:g} deg)"
+        )
         self.thread.start()
 
     def stop(self):
@@ -40,7 +45,7 @@ class MagneticSource:
 
     def snapshot(self):
         with self.lock:
-            return self.angles.copy(), self.rms, self.reacquired, self.error
+            return self.angles.copy(), self.rms, self.error
 
     def _read_fields(self):
         prime_sensor_pair(self.sensors)
@@ -52,21 +57,13 @@ class MagneticSource:
         return np.mean(samples, axis=0) - self.offsets
 
     def _run(self):
-        previous = None
         try:
             while not self.stop_event.is_set():
                 fields = self._read_fields()
-                result = self.estimator.estimate(
-                    fields,
-                    seed=None if self.args.cold_start else previous,
-                    global_starts=self.args.global_starts,
-                    reacquire_threshold_mT=self.args.reacquire_threshold_mT,
-                )
-                previous = result["angles_deg"]
+                result = self.estimator.estimate(fields)
                 with self.lock:
                     self.angles = result["angles_deg"]
                     self.rms = result["model_rms_mT"]
-                    self.reacquired = result["reacquired"]
         except Exception as error:
             with self.lock:
                 self.error = error
@@ -85,15 +82,14 @@ def run(args):
     figure.subplots_adjust(left=0.05, right=0.95, bottom=0.1, top=0.9)
 
     def update(_frame):
-        angles, rms, reacquired, error = source.snapshot()
+        angles, rms, error = source.snapshot()
         if error:
             status.set_text(f"Acquisition stopped: {error}")
             status.set_color("#b00020")
             return ()
         set_orientation(artists, angles)
         axis.set_title(angle_title("Magnetic estimate", angles), pad=12)
-        mode = "reacquired" if reacquired else "tracking"
-        status.set_text(f"model RMS {rms:.3f} mT     {mode}")
+        status.set_text(f"model RMS {rms:.3f} mT     KD-tree lookup")
         return ()
 
     closed = False
@@ -118,19 +114,17 @@ def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", type=Path, default=MODEL_PATH)
     parser.add_argument("--offsets", type=Path, default=OFFSETS_PATH)
+    parser.add_argument("--lookup-table", type=Path, default=LOOKUP_PATH)
     parser.add_argument("--samples", type=int, default=8)
     parser.add_argument("--sample-delay", type=float, default=0.03)
     parser.add_argument("--refresh-ms", type=int, default=100)
-    parser.add_argument("--global-starts", type=int, default=3)
-    parser.add_argument("--reacquire-threshold-mT", type=float, default=0.25)
-    parser.add_argument("--cold-start", action="store_true")
     parser.add_argument("--bus1", type=int, default=3)
     parser.add_argument("--bus2", type=int, default=4)
     args = parser.parse_args()
-    if args.samples < 1 or args.global_starts < 1:
-        parser.error("--samples and --global-starts must be positive")
-    if min(args.sample_delay, args.reacquire_threshold_mT) < 0:
-        parser.error("delays and thresholds cannot be negative")
+    if args.samples < 1:
+        parser.error("--samples must be positive")
+    if args.sample_delay < 0:
+        parser.error("--sample-delay cannot be negative")
     return args
 
 

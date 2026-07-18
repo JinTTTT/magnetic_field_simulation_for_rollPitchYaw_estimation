@@ -11,6 +11,7 @@ from .tlv493d import READER_TYPE
 ROOT = Path(__file__).resolve().parents[1]
 MODEL_PATH = ROOT / "config" / "model.json"
 OFFSETS_PATH = ROOT / "config" / "sensor_offsets.json"
+LOOKUP_PATH = ROOT / "config" / "pose_lookup.npz"
 VERIFICATION_PATH = ROOT / "data" / "verification.csv"
 VERIFICATION_REPORT_PATH = ROOT / "results" / "verification_report.json"
 
