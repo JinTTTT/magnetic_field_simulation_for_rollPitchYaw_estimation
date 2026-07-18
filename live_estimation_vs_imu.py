@@ -2,6 +2,7 @@
 """Show magnetic estimation beside an Xsens reference zeroed at startup."""
 
 import argparse
+import csv
 from pathlib import Path
 import threading
 import time
@@ -19,6 +20,12 @@ from magnetic_pose.tlv493d import open_sensor_pair, prime_sensor_pair, read_pair
 
 
 XSENS_TITLE = "Ground truth reference: Xsens MTi-630 IMU"
+RAW_CSV_COLUMNS = (
+    "t_s",
+    "imu_yaw_deg", "imu_pitch_deg", "imu_roll_deg",
+    "S1_Bx_raw_mT", "S1_By_raw_mT", "S1_Bz_raw_mT",
+    "S2_Bx_raw_mT", "S2_By_raw_mT", "S2_Bz_raw_mT",
+)
 
 
 class ComparisonSource:
@@ -26,6 +33,16 @@ class ComparisonSource:
         import serial
 
         self.args = args
+        self.record_path = getattr(args, "record_raw", None)
+        self.record_duration = float(getattr(args, "record_duration", 0.0))
+        self.record_force = bool(getattr(args, "force", False))
+        if self.record_path is not None:
+            self.record_path = Path(self.record_path)
+            if self.record_path.exists() and not self.record_force:
+                raise FileExistsError(
+                    f"{self.record_path} exists; pass --force to replace it"
+                )
+            self.record_path.parent.mkdir(parents=True, exist_ok=True)
         self.offsets = load_sensor_offsets(args.offsets)
         self.estimator = PoseEstimator(args.model, args.lookup_table)
         _buses, self.sensors = open_sensor_pair(args.bus1, args.bus2)
@@ -41,6 +58,7 @@ class ComparisonSource:
         self.estimate = np.zeros(3)
         self.reference = np.zeros(3)
         self.error = None
+        self.recorded_rows = 0
 
     def start(self):
         try:
@@ -79,6 +97,8 @@ class ComparisonSource:
         self.thread.join(timeout=2.0)
         self.imu.stop()
         self.serial_port.close()
+        if self.record_path is not None:
+            print(f"recorded {self.recorded_rows} rows to {self.record_path}")
 
     def snapshot(self):
         with self.lock:
@@ -87,17 +107,44 @@ class ComparisonSource:
             )
 
     def _run(self):
+        output = None
         try:
+            writer = None
+            record_started = None
+            record_deadline = None
+            if self.record_path is not None:
+                output = self.record_path.open("w", newline="", buffering=1)
+                writer = csv.writer(output)
+                writer.writerow(RAW_CSV_COLUMNS)
+                record_started = time.monotonic()
+                if self.record_duration:
+                    record_deadline = record_started + self.record_duration
+                print(f"recording raw data to {self.record_path}")
+
             prime_sensor_pair(self.sensors)
             field_filter = ExponentialMovingAverage(self.args.ema_alpha)
             while not self.stop_event.is_set():
-                measured = np.asarray(read_pair_mT(self.sensors)) - self.offsets
+                raw_fields = np.asarray(read_pair_mT(self.sensors))
+                magnetic_time = time.monotonic()
+                measured = raw_fields - self.offsets
                 fields = field_filter.update(measured)
                 raw_yaw, pitch, roll = self.imu.latest()
                 reference = np.array([
                     wrap180(raw_yaw - self.imu_yaw_zero), pitch, roll
                 ])
                 result = self.estimator.estimate(fields)
+                if writer is not None:
+                    if record_deadline is None or magnetic_time < record_deadline:
+                        writer.writerow((
+                            magnetic_time - record_started,
+                            *reference,
+                            *raw_fields,
+                        ))
+                        self.recorded_rows += 1
+                    else:
+                        output.flush()
+                        writer = None
+                        print(f"recording duration reached: {self.record_path}")
                 with self.lock:
                     self.estimate = result["angles_deg"]
                     self.reference = reference
@@ -106,6 +153,9 @@ class ComparisonSource:
         except Exception as error:
             with self.lock:
                 self.error = error
+        finally:
+            if output is not None:
+                output.close()
 
 
 def run(args):
@@ -128,6 +178,11 @@ def run(args):
             status.set_text(f"Acquisition stopped: {error}")
             status.set_color("#b00020")
             return ()
+        reference_axis.view_init(
+            elev=estimate_axis.elev,
+            azim=estimate_axis.azim,
+            roll=estimate_axis.roll,
+        )
         set_orientation(estimate_artists, estimate)
         set_orientation(reference_artists, reference)
         estimate_axis.set_title(angle_title("Magnetic estimate", estimate), pad=12)

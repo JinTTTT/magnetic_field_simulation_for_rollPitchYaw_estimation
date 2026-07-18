@@ -55,6 +55,24 @@ Reproduce the saved verification result:
 env/bin/python verify_model.py
 ```
 
+Record four raw comparison sessions separately. Keep the rig at mechanical home
+during the one-second yaw zero at the beginning of every command, then perform
+the named movement. Each command opens the same live magnetic/Xsens comparison
+figure, so it can be captured with a screen recorder. Close the figure to finish
+and save the CSV:
+
+```bash
+env/bin/python record_raw_session.py recordings/yaw.csv
+env/bin/python record_raw_session.py recordings/roll.csv
+env/bin/python record_raw_session.py recordings/pitch.csv
+env/bin/python record_raw_session.py recordings/random.csv
+```
+
+Every row uses the magnetic read time and contains only `t_s`, zeroed Xsens yaw,
+Xsens pitch and roll, and the six raw magnetic channels in mT. Use `--duration`
+for a fixed recording length or `--force` to replace an existing file. A fixed
+duration stops CSV recording while leaving the comparison figure open.
+
 ## Final performance
 
 | Measurement | Result |
@@ -91,6 +109,7 @@ tools/
   read_sensors.py
 live_estimation.py
 live_estimation_vs_imu.py
+record_raw_session.py
 verify_model.py
 ```
 

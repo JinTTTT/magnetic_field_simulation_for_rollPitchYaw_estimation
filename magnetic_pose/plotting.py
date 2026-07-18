@@ -15,7 +15,8 @@ def configure_panel(axis, title):
     axis.set_xlabel("world X")
     axis.set_ylabel("world Y")
     axis.set_zlabel("world Z")
-    axis.view_init(elev=25, azim=-55)
+    # Keep the 3D elevation and rotate the X-Y plane view 90 degrees about Z.
+    axis.view_init(elev=25, azim=-145, roll=0)
     axis.grid(True, alpha=0.25)
 
     for index, name in enumerate(AXES):
