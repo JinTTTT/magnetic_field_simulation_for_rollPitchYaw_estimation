@@ -35,27 +35,36 @@ def effective_pose_rotations(angles_deg, imu_axis_alignment_deg):
     return alignment * raw * alignment.inv()
 
 
-def predict_mT(angles_deg, model):
-    """Predict six offset-corrected magnetic channels for yaw/pitch/roll rows."""
-    magnet = model["magnet"]
-    sensors = model["sensors"]
-    pose = effective_pose_rotations(
-        angles_deg, model["imu_axis_alignment_deg"]
-    )
-    count = len(np.atleast_2d(angles_deg))
-
+def magnet_orientation(magnet):
+    """World orientation of the fixed magnet's local frame (local z is its axis)."""
     base = Rotation.from_euler("y", 90.0, degrees=True)
     tilt = Rotation.from_rotvec(np.radians((
         0.0,
         magnet["axis_tilt_y_deg"],
         magnet["axis_tilt_z_deg"],
     )))
-    source = magpy.magnet.Cylinder(
+    return tilt * base
+
+
+def build_magnet_source(model):
+    """Build the magpylib Cylinder source for the fixed magnet, in meters."""
+    magnet = model["magnet"]
+    return magpy.magnet.Cylinder(
         position=np.asarray(magnet["center_mm"], dtype=float) / 1000.0,
-        orientation=tilt * base,
+        orientation=magnet_orientation(magnet),
         dimension=np.asarray(magnet["dimension_mm"], dtype=float) / 1000.0,
         polarization=(0.0, 0.0, magnet["signed_polarization_T"]),
     )
+
+
+def predict_mT(angles_deg, model):
+    """Predict six offset-corrected magnetic channels for yaw/pitch/roll rows."""
+    sensors = model["sensors"]
+    pose = effective_pose_rotations(
+        angles_deg, model["imu_axis_alignment_deg"]
+    )
+    count = len(np.atleast_2d(angles_deg))
+    source = build_magnet_source(model)
 
     homes = sensor_home_positions_mm(
         sensors["sensor_plane_z_mm"],
