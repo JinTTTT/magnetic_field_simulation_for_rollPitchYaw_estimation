@@ -30,23 +30,15 @@ def style_field_axes(ax, span):
 
 
 def add_sweep_header(ax, motion_name, axis_name, angle_symbol, result_text):
+    """Add a concise plot label; the slides supply the explanatory context."""
     ax.text2D(
         0.03,
         0.96,
-        f"Off-center {motion_name.lower()} sweep",
+        f"{motion_name} sweep",
         transform=ax.transAxes,
         fontsize=13,
         fontweight="bold",
         color="0.15",
-        va="top",
-    )
-    ax.text2D(
-        0.03,
-        0.91,
-        rf"About joint ${axis_name}$ axis   Sensor 1 frame   ${angle_symbol}$ {result_text}",
-        transform=ax.transAxes,
-        fontsize=10,
-        color="0.35",
         va="top",
     )
 

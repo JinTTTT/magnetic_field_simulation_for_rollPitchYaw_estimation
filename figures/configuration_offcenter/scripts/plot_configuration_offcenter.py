@@ -143,26 +143,6 @@ def main():
     ax.yaxis.pane.set_alpha(0.0)
     ax.zaxis.pane.set_alpha(0.0)
 
-    ax.text2D(
-        0.03,
-        0.96,
-        "Off-center configuration",
-        transform=ax.transAxes,
-        fontsize=13,
-        fontweight="bold",
-        color="0.15",
-        va="top",
-    )
-    ax.text2D(
-        0.03,
-        0.91,
-        "Magnet +10 mm along Z   Sensor 1 unchanged",
-        transform=ax.transAxes,
-        fontsize=10,
-        color="0.35",
-        va="top",
-    )
-
     fig.tight_layout()
     fig.savefig(OUTPUT_PATH, dpi=200, bbox_inches="tight")
     print(f"saved {OUTPUT_PATH}")
