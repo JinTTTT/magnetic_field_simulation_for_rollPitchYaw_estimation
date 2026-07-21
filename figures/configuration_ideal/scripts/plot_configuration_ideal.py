@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Magnet + Sensor 1 placement schematic, for slides.
+"""Ideal centered magnet + Sensor 1 configuration, for slides.
 
-Draws the fixed rig magnet (disc, N/S colored) and Sensor 1 (TLV493D) as a
-small box at its rig position, with the sensor's own x/y/z axes drawn at the
-box center.
+Draws the centered, untilted magnet and Sensor 1 at the same height, with the
+sensor's own x/y/z axes drawn at the box center. This is the ideal reference
+configuration before introducing an off-center magnet.
 """
 
 import itertools
@@ -13,15 +13,21 @@ from pathlib import Path
 
 os.environ.setdefault("MPLCONFIGDIR", "/tmp/magnetic_orientation_matplotlib")
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+SCRIPT_DIR = Path(__file__).resolve().parent
+IDEAL_DIR = SCRIPT_DIR.parent
+FIGURES_DIR = IDEAL_DIR.parent
+ROOT = FIGURES_DIR.parent
+
+sys.path.insert(0, str(FIGURES_DIR))
+sys.path.insert(0, str(ROOT))
 
 import matplotlib.pyplot as plt
 import numpy as np
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
-from magnetic_pose.model import load_model
 from magnetic_pose.plotting import AXES, COLORS
+from ideal_configuration import IDEAL_MODEL, SENSOR_1_HOME_MM
+import plot_field_lines as field_plot
 from plot_field_lines import (
     COLOR_VMAX_MT,
     COLOR_VMIN_MT,
@@ -32,13 +38,18 @@ from plot_field_lines import (
     magnet_geometry,
 )
 
-OUTPUT_PATH = Path(__file__).resolve().parent / "magnet_sensor_geometry.png"
+OUTPUT_PATH = IDEAL_DIR / "plots" / "configuration_ideal.png"
 
-SENSOR_1_POSITION_MM = np.array([0.0, -24.0, None])  # z filled in from magnet center
 BOX_SIZE_MM = np.array([6.0, 6.0, 2.0])
 AXIS_LENGTH_MM = 9.0
 BOUND_HALF_RANGE_MM = 34.0
 VIEW = dict(elev=45, azim=205)
+
+# Match the off-center schematic's clean, quick-to-render field-line density.
+field_plot.RADIUS_FRACS = (0.40, 0.75)
+field_plot.NUM_AZIMUTH = 8
+field_plot.MAX_STEPS = 700
+field_plot.MAX_ARC_LENGTH_MM = 50.0
 
 
 def draw_box(ax, center_mm, size_mm, facecolor="#dcdcdc", edgecolor="0.35"):
@@ -71,14 +82,11 @@ def draw_axes_triad(ax, center_mm, length_mm):
 
 
 def main():
-    model = load_model()
-    geometry = magnet_geometry(model)
+    geometry = magnet_geometry(IDEAL_MODEL)
     center_mm = geometry["center_mm"]
+    sensor_mm = SENSOR_1_HOME_MM
 
-    sensor_mm = SENSOR_1_POSITION_MM.copy()
-    sensor_mm[2] = center_mm[2]
-
-    paths, mags = compute_field_lines(model, geometry)
+    paths, mags = compute_field_lines(IDEAL_MODEL, geometry)
     norm = plt.Normalize(vmin=COLOR_VMIN_MT, vmax=COLOR_VMAX_MT, clip=True)
     cmap = plt.get_cmap(CMAP_NAME)
 
@@ -108,6 +116,26 @@ def main():
     ax.xaxis.pane.set_alpha(0.0)
     ax.yaxis.pane.set_alpha(0.0)
     ax.zaxis.pane.set_alpha(0.0)
+
+    ax.text2D(
+        0.03,
+        0.96,
+        "Ideal configuration",
+        transform=ax.transAxes,
+        fontsize=13,
+        fontweight="bold",
+        color="0.15",
+        va="top",
+    )
+    ax.text2D(
+        0.03,
+        0.91,
+        "Magnet centered on joint   Sensor 1 at same height",
+        transform=ax.transAxes,
+        fontsize=10,
+        color="0.35",
+        va="top",
+    )
 
     fig.tight_layout()
     fig.savefig(OUTPUT_PATH, dpi=200, bbox_inches="tight")

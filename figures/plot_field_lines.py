@@ -207,6 +207,17 @@ def main():
     ax.yaxis.pane.set_alpha(0.0)
     ax.zaxis.pane.set_alpha(0.0)
 
+    ax.text2D(
+        0.03,
+        0.96,
+        "Magnetic field lines",
+        transform=ax.transAxes,
+        fontsize=13,
+        fontweight="bold",
+        color="0.15",
+        va="top",
+    )
+
     mappable = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
     mappable.set_array(all_mags)
     cbar = fig.colorbar(mappable, ax=ax, shrink=0.6, pad=0.08)
