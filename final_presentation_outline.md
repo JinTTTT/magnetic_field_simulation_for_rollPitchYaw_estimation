@@ -74,7 +74,9 @@ Show the off-centre yaw, pitch, and roll sweep plots.
 Off-centre geometry makes the single sensor sensitive to all three rotation axes.
 
 ## Slide 6: Final Hardware Concept
+show the figures of hardware: /Users/jtao/Documents/study/study/CES/SS2026/mwrs/magnetic_field_simulation_for_rollPitchYaw_estimation/figures/hardware_setting_1.heic, and /Users/jtao/Documents/study/study/CES/SS2026/mwrs/magnetic_field_simulation_for_rollPitchYaw_estimation/figures/hardware_setting_2.heic
 
+note:
   - Fixed cylindrical magnet
   - Two spatially separated TLV493D sensors on the rotating joint side
   - Input: one six-channel magnetic measurement
@@ -91,12 +93,17 @@ Show `system_pipeline.png`.
 ## Slides 1-4: Live Tracking Videos (1-2 minutes)
 
 Show the four videos: yaw, pitch, roll, and random motion.
+each one has a single slide , path : /Users/jtao/Documents/study/study/CES/SS2026/mwrs/magnetic_field_simulation_for_rollPitchYaw_estimation/videos
+
 
 ## Slide 5: Estimated Angles vs Reference Angles
 
 ## Slide 6: Estimation Error
+one slide Show the accuracy and standard-deviation plot.
+/Users/jtao/Documents/study/study/CES/SS2026/mwrs/magnetic_field_simulation_for_rollPitchYaw_estimation/figures/verification_accuracy/verification_mae_std.png
 
-Show the accuracy and standard-deviation plot.
+
+one slide show  magnetic_field_simulation_for_rollPitchYaw_estimation/figures/verification_accuracy/random_tracking.png
 
 ## Slide 7: Overall Performance
 

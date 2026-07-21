@@ -6,3 +6,17 @@ env/
 __pycache__/
 *.pyc
 .claude/
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# LibreOffice / Keynote / Office lock files
+.~lock.*#
+
+# Presentation build & render artifacts
+unpacked/
+knunpacked/
+*_unpacked/
+/*.jpg
+/*.jpeg
