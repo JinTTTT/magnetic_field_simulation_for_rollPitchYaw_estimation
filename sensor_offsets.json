@@ -1,5 +1,0 @@
-{
-  "comment": "Magnet-out zero offsets (mT), recorded 2026-07-16 at roughly home pose (yaw 0.04, pitch 1.76, roll 3.44). Includes Earth's field (~0.05 mT). Subtract from all magnet-in readings.",
-  "S1": [-0.0735, 0.0796, -0.0674],
-  "S2": [0.0919, 0.0429, -0.0245]
-}

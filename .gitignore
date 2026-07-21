@@ -1,7 +1,8 @@
 # virtual environment
 .venv/
+env/
 
 # python
 __pycache__/
 *.pyc
-
+.claude/

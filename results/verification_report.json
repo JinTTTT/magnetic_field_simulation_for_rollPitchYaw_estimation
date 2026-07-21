@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "model": "config/model.json",
+  "data": "data/verification.csv",
+  "poses": 60,
+  "note": "Xsens yaw drift is estimated against the magnetic model; yaw metrics measure repeatability, not an independent absolute-yaw holdout.",
+  "error_deg": {
+    "yaw": {
+      "mae": 0.7092878483427246,
+      "rmse": 1.0411839097848243,
+      "p95": 2.965505176469412,
+      "max": 3.2532031830619985
+    },
+    "pitch": {
+      "mae": 0.38170790000000004,
+      "rmse": 0.5371298385973668,
+      "p95": 1.2852688499999996,
+      "max": 1.5810380000000004
+    },
+    "roll": {
+      "mae": 0.7007985833333333,
+      "rmse": 0.8859109974128985,
+      "p95": 1.8976235499999992,
+      "max": 2.3271129999999998
+    }
+  },
+  "xsens_heading_drift_deg": {
+    "swing": 2.65170510441615,
+    "knot_times_s": [
+      0.0,
+      79.83702675,
+      159.6740535,
+      239.51108025000002,
+      319.348107,
+      399.18513375000003,
+      479.02216050000004,
+      558.8591872500001,
+      638.696214
+    ],
+    "values": [
+      -7.8155432922738175,
+      -7.998099629206908,
+      -6.294481521544214,
+      -7.6921473383232,
+      -8.380956411711145,
+      -7.0664821188528375,
+      -8.462282230287443,
+      -5.696933308087345,
+      -6.164538010500171
+    ]
+  },
+  "estimator": {
+    "type": "nearest_lookup_kdtree",
+    "lookup_table": "config/pose_lookup.npz",
+    "poses": 106281,
+    "yaw_step_deg": 0.5,
+    "pitch_roll_step_deg": 1.0
+  }
+}

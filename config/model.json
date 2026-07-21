@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-07-17T20:26:46.418334+00:00",
+  "status": "accepted_final_model",
+  "model_type": "finite_cylinder_fixed_magnet_rotating_sensor_platform",
+  "units": {
+    "length": "mm",
+    "field": "mT",
+    "angle": "degree"
+  },
+  "pose_convention": {
+    "order": [
+      "yaw",
+      "pitch",
+      "roll"
+    ],
+    "euler_sequence": "ZYX",
+    "yaw_reference": "mechanical_dial",
+    "workspace_deg": {
+      "yaw": [-60.0, 60.0],
+      "pitch": [-10.0, 10.0],
+      "roll": [-10.0, 10.0]
+    }
+  },
+  "imu_axis_alignment_deg": 29.348915133165413,
+  "magnet": {
+    "type": "finite_cylinder",
+    "center_mm": [
+      0.5296676454022422,
+      -0.1037769494747486,
+      25.406479147813762
+    ],
+    "dimension_mm": [
+      10.0,
+      5.0
+    ],
+    "axis_tilt_y_deg": 3.704163200179915,
+    "axis_tilt_z_deg": -8.527427006427219,
+    "signed_polarization_T": -1.1199896964866292
+  },
+  "sensors": {
+    "sensor_plane_z_mm": 18.67608380682898,
+    "ring_radius_mm": 23.881800908484298,
+    "sensor_1_azimuth_deg": 0.0,
+    "angular_separation_deg": 125.39670385131862,
+    "home_positions_mm": [
+      [
+        23.881800908484298,
+        0.0,
+        18.67608380682898
+      ],
+      [
+        -13.833157710979085,
+        -19.467515567623447,
+        18.67608380682898
+      ]
+    ],
+    "rig_to_chip_rotation_matrices": [
+      [
+        [
+          -0.002460750566780856,
+          -0.9999350565880297,
+          0.011127772146398105
+        ],
+        [
+          0.9999219483455398,
+          -0.0023241069144750437,
+          0.012275819480177766
+        ],
+        [
+          -0.012249160114387843,
+          0.011157111335115169,
+          0.9998627290499172
+        ]
+      ],
+      [
+        [
+          -0.8655921594230761,
+          0.49737421410709054,
+          0.05804398923790698
+        ],
+        [
+          -0.5006390891769928,
+          -0.862003258374764,
+          -0.07944107841237391
+        ],
+        [
+          0.010522163908971337,
+          -0.09782266451412955,
+          0.9951482353770361
+        ]
+      ]
+    ]
+  },
+  "calibration_gate_passed": true
+}
